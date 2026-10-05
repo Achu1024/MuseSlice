@@ -110,6 +110,7 @@ namespace QuickNote
             };
             box.TextChangedByUser += delegate
             {
+                ExpandTodoMarker(box);
                 MarkdownHighlighter.Apply(box, _palette);
                 FitToContent();
                 _caret.Follow();
@@ -119,6 +120,36 @@ namespace QuickNote
             box.GotFocus += delegate { _caret.Attach(box, _content, _scale); };
             box.LostFocus += delegate { _caret.Stop(); };
             return box;
+        }
+
+        /// <summary>
+        /// 打进「- 」就自动补成勾选框并画成脸（定案 §10.4）。屏幕上看到的是脸，
+        /// 文件里存的是 "- [ ]"——使用者从未真正手打过 "[ ]"，所以不构成困扰。
+        /// <para>
+        /// 只在行首正好打出这两个字符时触发。行中间打 "- " 是正常内容，不动它。
+        /// </para>
+        /// </summary>
+        private void ExpandTodoMarker(BarTextBox box)
+        {
+            if (box.SelectionLength != 0) return;
+
+            var caret = box.SelectionStart;
+            if (caret < 2) return;
+
+            var lineStart = box.GetFirstCharIndexOfCurrentLine();
+            if (caret - lineStart != 2) return;      // 不是刚在行首打完两个字符
+
+            var text = box.Text;
+            if (lineStart + 1 >= text.Length) return;
+            if (text[lineStart] != '-' || text[lineStart + 1] != ' ') return;
+
+            // 赋值 SelectedText 会再触发一次 TextChangedByUser。回到这里时行首已经
+            // 是脸而不是 "- "，上面那道判断自然拦住，不会递归。
+            var face = EntryLine.UndoneFace + " ";
+            box.Select(lineStart, 2);
+            box.SelectedText = face;
+            box.SelectionStart = lineStart + face.Length;
+            box.SelectionLength = 0;
         }
 
         private SearchResultsView BuildResults(Palette palette)
