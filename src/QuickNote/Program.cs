@@ -29,6 +29,8 @@ namespace QuickNote
             _tray.OpenTodayRequested += OpenToday;
             _tray.OpenNotesFolderRequested += OpenNotesFolder;
             _tray.ExitRequested += ExitApp;
+            _tray.SettingsRequested += OpenSettings;
+            _tray.AutoStartToggled += ToggleAutoStart;
 
             _bar = new CaptureBar(Theme.Current(_config.Theme), _store);
 
@@ -38,6 +40,10 @@ namespace QuickNote
                 _tray.Balloon("QuickNote 热键降级", reason);
             };
             _hotkeys.Start(ShowBar);
+
+            // 自启：注册表里存的是绝对路径，程序挪过位置就静默失效，每次启动自查一遍
+            AutoStart.EnsurePathCurrent();
+            if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
         }
 
         private void ShowBar()
@@ -63,6 +69,30 @@ namespace QuickNote
         {
             try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
             catch (Exception ex) { Log("打开失败 " + path + "：" + ex.Message); }
+        }
+
+        private void OpenSettings()
+        {
+            using (var dlg = new SettingsDialog(_config))
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+            }
+
+            _store = new NoteStore(_config.NotesDir);
+            _bar.SetStore(_store);
+            _hotkeys.ApplyConfigChange();
+            _bar.ApplyTheme(Theme.Current(_config.Theme));
+            if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
+            _tray.SetAutoStartChecked(_config.AutoStart);
+            _tray.Balloon("QuickNote", "设置已保存");
+        }
+
+        private void ToggleAutoStart()
+        {
+            _config.AutoStart = !_config.AutoStart;
+            if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
+            _config.Save(AppConfig.DefaultConfigPath());
+            _tray.SetAutoStartChecked(_config.AutoStart);
         }
 
         private void ExitApp()

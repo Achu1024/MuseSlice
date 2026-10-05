@@ -17,15 +17,15 @@ namespace QuickNote
         private const int LogicalLineHeight = 22;
         private const int LogicalChrome = 90;
 
-        private readonly Palette _palette;
-        private readonly NoteStore _store;
+        private Palette _palette;      // 非 readonly：改主题时要换掉
+        private NoteStore _store;      // 非 readonly：改日记目录时要换掉
         private readonly BarChrome _chrome;
 
         private readonly Panel _content;          // 两种模式互斥的内容区
         private readonly BarTextBox _input;
         private readonly SearchResultsView _results;
         private readonly Panel _searchRow;
-        private readonly SearchController _search;
+        private SearchController _search;   // 非 readonly：改目录时要重建
         private TextBox _queryBox;      // 由 BuildSearchRow 赋值
         private Label _searchStatus;    // 由 BuildSearchRow 赋值
 
@@ -392,6 +392,38 @@ namespace QuickNote
                 RefreshChrome();
                 _input.Focus();
             }
+        }
+
+        /// <summary>设置里改了日记目录后，把存储与搜索器一起换掉。</summary>
+        public void SetStore(NoteStore store)
+        {
+            _store = store;
+            _search.Dispose();
+            _search = new SearchController(this, store.NotesDir, OnSearchResult, OnSearchStarted);
+            _lastQuery = "";
+            _lastResult = SearchResult.Empty();
+            _queryBox.Text = "";
+            _results.SetResult(_lastResult, "");
+            RefreshChrome();
+        }
+
+        /// <summary>设置里改了主题后重新着色。</summary>
+        public void ApplyTheme(Palette palette)
+        {
+            _palette = palette;
+            BackColor = palette.BarBack;
+            _content.BackColor = palette.BarBack;
+            _input.BackColor = palette.BarBack;
+            _input.ForeColor = palette.Text;
+            _input.Font = palette.Body;
+            _queryBox.BackColor = palette.BarBack;
+            _queryBox.ForeColor = palette.Text;
+            _queryBox.Font = palette.Body;
+            _chrome.Top.ForeColor = palette.Muted;
+            _chrome.Bottom.ForeColor = palette.Muted;
+            _searchStatus.ForeColor = palette.Muted;
+            MarkdownHighlighter.Apply(_input, palette);
+            Invalidate(true);
         }
 
         private static void OpenHit(SearchHit hit)
