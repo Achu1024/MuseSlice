@@ -3911,7 +3911,7 @@ namespace QuickNote
         {
             if (_mode == BarMode.Search)
             {
-                _chrome.Top.Text = "搜索日记";
+                _chrome.Top.Text = "搜索条目";
                 _chrome.Bottom.Text = "↑↓ 选择　·　Enter 打开　·　Tab 返回";
             }
             else
