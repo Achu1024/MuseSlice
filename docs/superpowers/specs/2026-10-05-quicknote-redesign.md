@@ -294,9 +294,24 @@ dotnet run --project src/QuickNote.SelfCheck -c Debug # 自检，当前 131 条�
 
 ### 仍未验证的（要提醒使用者）
 
-- **中文输入法组合态按 Enter 不误保存** —— 最关键的一条
+视觉重做 + 勾选框 + 删除已实现（见 `../plans/2026-10-05-quicknote-redesign.md`，
+账本 `.superpowers/sdd/2026-10-05-quicknote-redesign/progress.md`）。以下是**仍然**
+只能由真人验证的，一条都没自动验证过：
+
+- **中文输入法组合态按 Enter 不误保存** —— 最关键的一条，失效则中文写作完全不可用
 - 双击 Ctrl 后直接打字不碰鼠标、空框按 Tab
-- 小条的投影、圆角、着色效果、光标是否跳（都没人眼看过）
+- 小条的投影、圆角；上下两条 hairline 是否出现
+- **行距**：最后一行下面不该有多余空当，打满 8 行时最后一行不被切掉
+- **自绘光标**：位置对不对、明暗过渡柔不柔和、有没有和系统那根 1px 光标同时闪
+- **emoji 是不是彩色的**：😶‍🌫️ 是 ZWJ 序列（U+1F636 ZWJ U+1F32B VS16），
+  比单个 emoji 更容易退化成两个分开的字形或黑白字形
+- 搜索页空格勾选、Backspace 删除确认态的整条键位链（合成按键进不了 WinForms，
+  判定规则本身有 9 条断言，但「按下去真的走了那条路」没人验过）
+
+已经自动验证过的：删除/勾选的落盘（含带 BOM 的旧文件、旧格式续行、行号失效时拒绝写入、
+`.bak` 只在当天首次改写前留）、新旧两种记录格式的解析、光标明暗曲线、行数钳制。
+自检 239 条断言全绿；Release 构建 0 警告 0 错误，无第三方 DLL；
+待机私有工作集 21.7MB（预算 35MB），与重做前持平。
 
 ### 相关文档
 
@@ -306,4 +321,6 @@ dotnet run --project src/QuickNote.SelfCheck -c Debug # 自检，当前 131 条�
 | `2026-10-05-quicknote.md` | 原始实现计划（已执行完，仅作参考） |
 | `2026-10-05-quicknote-acceptance.md` | 验收记录，第三节仍是空的 |
 | `.superpowers/sdd/2026-10-05-quicknote/progress.md` | 执行账本，含全部裁定与陷阱 |
+| `../plans/2026-10-05-quicknote-redesign.md` | 视觉重做 + 勾选框 + 删除的实现计划（已执行完） |
+| `.superpowers/sdd/2026-10-05-quicknote-redesign/progress.md` | 本轮的账本，含全部裁定 |
 | 分支 `feature/quicknote` | 未合并到 master，等你验收 |
