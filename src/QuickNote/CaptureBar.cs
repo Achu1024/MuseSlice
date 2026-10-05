@@ -421,7 +421,7 @@ namespace QuickNote
             if (_mode == BarMode.Search)
             {
                 _chrome.Top.Text = "搜索条目";
-                _chrome.Bottom.Text = "↑↓ 选择　·　Enter 打开　·　Tab 返回";
+                _chrome.Bottom.Text = "↑↓ 选择　·　空格 完成　·　Enter 打开　·　Tab 返回";
             }
             else
             {
@@ -434,6 +434,14 @@ namespace QuickNote
 
         private void OnSearchKeyDown(object sender, KeyEventArgs e)
         {
+            if (InputRules.DecideSearchKey(_queryBox.Text, false, ToSearchKey(e.KeyCode))
+                == SearchKeyAction.ToggleDone)
+            {
+                e.SuppressKeyPress = true;
+                ToggleSelected();
+                return;
+            }
+
             if (e.KeyCode == Keys.Down) { _results.MoveSelection(1); e.SuppressKeyPress = true; return; }
             if (e.KeyCode == Keys.Up) { _results.MoveSelection(-1); e.SuppressKeyPress = true; return; }
             if (e.KeyCode == Keys.Enter) { _results.ActivateSelected(); e.SuppressKeyPress = true; return; }
@@ -442,6 +450,47 @@ namespace QuickNote
                 e.SuppressKeyPress = true;
                 SwitchTo(BarMode.Record);
             }
+        }
+
+        private static SearchKey ToSearchKey(Keys key)
+        {
+            if (key == Keys.Space) return SearchKey.Space;
+            if (key == Keys.Back) return SearchKey.Backspace;
+            if (key == Keys.Enter) return SearchKey.Enter;
+            if (key == Keys.Escape) return SearchKey.Escape;
+            return SearchKey.Other;
+        }
+
+        /// <summary>
+        /// 切换选中条目的完成状态。这一下就是写到盘上的那一下——屏幕上脸变了，
+        /// 文件里对应的 "- [ ]" 也跟着变成 "- [x]"。
+        /// </summary>
+        private void ToggleSelected()
+        {
+            var hit = _results.SelectedHit;
+            if (hit == null) return;
+
+            EntryInfo info;
+            if (!EntryLine.TryParse(hit.Line, out info)) return;
+
+            try
+            {
+                if (!_store.SetDone(hit.Date, hit.LineNumber, hit.Line, !info.IsDone))
+                {
+                    // 文件在列表生成之后被改过。不写，重新列一遍让使用者看到真实内容。
+                    _searchStatus.Text = "这条记录已经变了，已重新载入";
+                    _search.Query(_lastQuery);
+                    return;
+                }
+            }
+            catch (NoteStoreException ex)
+            {
+                QuickNoteApp.Log(ex.Message);
+                _searchStatus.Text = "改写失败：" + ex.Message;
+                return;
+            }
+
+            _search.Query(_lastQuery);
         }
 
         private void OnSearchStarted()

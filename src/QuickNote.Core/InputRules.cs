@@ -14,6 +14,26 @@ namespace QuickNote.Core
         Ignore
     }
 
+    /// <summary>搜索页需要判定的按键。用 Core 自己的枚举，不引用 WinForms。</summary>
+    public enum SearchKey
+    {
+        Space,
+        Backspace,
+        Enter,
+        Escape,
+        Other
+    }
+
+    public enum SearchKeyAction
+    {
+        /// <summary>交给控件按常规处理。</summary>
+        PassThrough,
+        ToggleDone,
+        AskDelete,
+        ConfirmDelete,
+        CancelDelete
+    }
+
     /// <summary>
     /// 按键判定规则。故意做成纯函数：这几个分支是最容易出错、
     /// 又最难靠手动敲键盘验证的地方（尤其是输入法组合态）。
@@ -43,6 +63,35 @@ namespace QuickNote.Core
         {
             if (isComposing) return EnterAction.Ignore;
             return shiftHeld ? EnterAction.Newline : EnterAction.Save;
+        }
+
+        /// <summary>
+        /// 搜索页的按键判定。和 <see cref="DecideTab"/> 是同一类问题：
+        /// 空格与 Backspace 都是最常用的编辑键，只有在查询框为空、它们本来就
+        /// 无事可做的时候才能挪用（定案 §10.5）。
+        /// <para>
+        /// 确认态下 Enter 的语义被覆盖成「确认删除」——这是有意的，
+        /// 确认态是个模态瞬间，Esc 能退出来。
+        /// </para>
+        /// </summary>
+        public static SearchKeyAction DecideSearchKey(string query, bool confirmPending, SearchKey key)
+        {
+            var queryIsEmpty = string.IsNullOrEmpty(query);
+
+            if (confirmPending)
+            {
+                if (key == SearchKey.Enter) return SearchKeyAction.ConfirmDelete;
+                if (key == SearchKey.Escape) return SearchKeyAction.CancelDelete;
+                return SearchKeyAction.PassThrough;
+            }
+
+            if (key == SearchKey.Space)
+                return queryIsEmpty ? SearchKeyAction.ToggleDone : SearchKeyAction.PassThrough;
+
+            if (key == SearchKey.Backspace)
+                return queryIsEmpty ? SearchKeyAction.AskDelete : SearchKeyAction.PassThrough;
+
+            return SearchKeyAction.PassThrough;
         }
     }
 }
