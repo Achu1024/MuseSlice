@@ -486,7 +486,30 @@ namespace QuickNote
         {
             Reposition();
             Show();
-            NativeMethods.SetForegroundWindow(Handle);
+
+            // 必须真正抢到前台，否则小条虽然画出来了，键盘焦点还在原来那个窗口上：
+            // Tab、Enter、Esc、打字全部会打到别处，使用者得先用鼠标点一下才正常。
+            NativeMethods.ForceForeground(Handle);
+
+            // 激活是异步的，Focus() 紧跟其后可能落在激活完成之前。
+            // 用 BeginInvoke 推到消息队列尾部，等激活落地后再设焦点。
+            BeginInvoke((Action)FocusInput);
+        }
+
+        /// <summary>把键盘焦点放到当前模式该拿焦点的控件上。</summary>
+        private void FocusInput()
+        {
+            Activate();
+            if (_mode == BarMode.Search)
+            {
+                _queryBox.Focus();
+                _queryBox.SelectionStart = _queryBox.TextLength;
+            }
+            else
+            {
+                _input.Focus();
+                _input.SelectionStart = _input.TextLength;
+            }
         }
 
         public void HideBar()
