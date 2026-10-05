@@ -11,6 +11,7 @@ namespace QuickNote
         private readonly AppConfig _config;
         private readonly TrayIcon _tray;
         private readonly MessageWindow _messageWindow;
+        private HotkeyManager _hotkeys;
         private CaptureBar _bar;
 
         public QuickNoteApp()
@@ -28,6 +29,13 @@ namespace QuickNote
             _tray.ExitRequested += ExitApp;
 
             _bar = new CaptureBar(Theme.Current(_config.Theme));
+
+            _hotkeys = new HotkeyManager(_config);
+            _hotkeys.Degraded += delegate (string reason)
+            {
+                _tray.Balloon("QuickNote 热键降级", reason);
+            };
+            _hotkeys.Start(ShowBar);
         }
 
         private void ShowBar()
@@ -75,6 +83,7 @@ namespace QuickNote
 
         protected override void ExitThreadCore()
         {
+            if (_hotkeys != null) _hotkeys.Dispose();
             if (_tray != null) _tray.Dispose();
             if (_messageWindow != null) _messageWindow.Dispose();
             base.ExitThreadCore();
