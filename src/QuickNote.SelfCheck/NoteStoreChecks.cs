@@ -24,6 +24,99 @@ namespace QuickNote.SelfCheck
             PathWithChineseCharacters();
             LockedFileThrows();
             CountsEntriesNotListLines();
+            RewritesAtomically();
+            SetDoneFlipsOnlyThatLine();
+            RefusesStaleLineNumber();
+            SecondDeleteKeepsFirstBackup();
+        }
+
+        private static void RewritesAtomically()
+        {
+            using (var dir = new TempDir())
+            {
+                var store = new NoteStore(dir.Path);
+                store.Append("第一条", Day);
+                var path = store.PathFor(Day);
+                var before = File.ReadAllText(path, Encoding.UTF8);
+
+                Check.That(store.DeleteEntry(Day, 3, "- [ ] 14:30 第一条"), "删掉第 3 行那条记录");
+                Check.Equal(store.CountEntries(Day), 0, "删完之后条数归零");
+                Check.That(!File.Exists(path + ".tmp"), "临时文件不残留");
+                Check.That(File.Exists(path + ".bak"), "删除前留下 .bak");
+                Check.Equal(File.ReadAllText(path + ".bak", Encoding.UTF8), before,
+                    ".bak 是动手之前的样子");
+                Check.That(!File.Exists(Path.Combine(dir.Path, "2026-10-05.md.bak.md")),
+                    ".bak 不会被当成日记文件");
+            }
+        }
+
+        private static void SetDoneFlipsOnlyThatLine()
+        {
+            using (var dir = new TempDir())
+            {
+                var store = new NoteStore(dir.Path);
+                store.Append("买牛奶\n买鸡蛋", Day);
+                var path = store.PathFor(Day);
+
+                Check.That(store.SetDone(Day, 3, "- [ ] 14:30 买牛奶", true), "把第一条标成已完成");
+                Check.Equal(File.ReadAllText(path, Encoding.UTF8),
+                    "# 2026-10-05 星期一\n\n- [x] 14:30 买牛奶\n- [ ] 14:30 买鸡蛋\n\n",
+                    "只有被勾的那一行变了");
+
+                Check.That(!store.SetDone(Day, 3, "- [x] 14:30 买牛奶", true),
+                    "已经是完成态时不再写一次");
+
+                // 旧格式的记录被勾选时要升级成新格式，而不是保持原样。
+                // Append 已经只写新格式了，所以这一份旧文件得手工造。
+                var legacyDay = new DateTime(2026, 10, 6);
+                File.WriteAllText(store.PathFor(legacyDay),
+                    "# 2026-10-06 星期二\n\n- 09:00 旧的\n\n", new UTF8Encoding(false));
+
+                Check.That(store.SetDone(legacyDay, 3, "- 09:00 旧的", true), "勾选旧格式的记录");
+                Check.Equal(File.ReadAllText(store.PathFor(legacyDay), Encoding.UTF8),
+                    "# 2026-10-06 星期二\n\n- [x] 09:00 旧的\n\n",
+                    "旧格式被升级成新格式，时间戳与正文不变");
+            }
+        }
+
+        private static void RefusesStaleLineNumber()
+        {
+            using (var dir = new TempDir())
+            {
+                var store = new NoteStore(dir.Path);
+                store.Append("第一条\n第二条", Day);
+                var path = store.PathFor(Day);
+
+                store.DeleteEntry(Day, 3, "- [ ] 14:30 第一条");
+                var after = File.ReadAllText(path, Encoding.UTF8);
+
+                // 列表生成之后文件变了，旧行号已经指向另一条记录。
+                // 这时宁可不写，也不能按旧行号去删/勾一条使用者没选中的记录。
+                Check.That(!store.DeleteEntry(Day, 3, "- [ ] 14:30 第一条"),
+                    "行号已失效时拒绝删除");
+                Check.Equal(File.ReadAllText(path, Encoding.UTF8), after, "被拒绝时文件一字未动");
+
+                Check.That(!store.SetDone(Day, 99, "- [ ] 14:30 第二条", true), "行号越界时拒绝");
+                Check.That(!store.SetDone(Day, 3, "完全不是记录的一行", true), "行内容对不上时拒绝");
+                Check.That(!store.DeleteEntry(NextDay, 3, "x"), "那天的文件不存在时返回 false 而不是抛错");
+            }
+        }
+
+        private static void SecondDeleteKeepsFirstBackup()
+        {
+            using (var dir = new TempDir())
+            {
+                var store = new NoteStore(dir.Path);
+                store.Append("第一条\n第二条\n第三条", Day);
+                var path = store.PathFor(Day);
+                var before = File.ReadAllText(path, Encoding.UTF8);
+
+                store.DeleteEntry(Day, 3, "- [ ] 14:30 第一条");
+                store.DeleteEntry(Day, 3, "- [ ] 14:30 第二条");
+
+                Check.Equal(File.ReadAllText(path + ".bak", Encoding.UTF8), before,
+                    "第二次删除不覆盖 .bak——保留的是今天动手之前的样子");
+            }
         }
 
         private static void NewFileGetsHeading()
