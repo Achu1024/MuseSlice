@@ -18,6 +18,7 @@ namespace QuickNote
         private int _selected;
         private int _firstVisible;
         private string _query = "";
+        private bool _danger;
 
         public event Action<SearchHit> Activated;
 
@@ -27,7 +28,15 @@ namespace QuickNote
             DoubleBuffered = true;
             SetStyle(ControlStyles.ResizeRedraw | ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
-            BackColor = p.BarBack;
+            BackColor = p.Paper;
+        }
+
+        /// <summary>删除确认态：选中行改用错误色底纹，让「这一下会删掉」看得见。</summary>
+        public void SetDanger(bool danger)
+        {
+            if (_danger == danger) return;
+            _danger = danger;
+            Invalidate();
         }
 
         public SearchHit SelectedHit
@@ -86,11 +95,11 @@ namespace QuickNote
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
-            g.Clear(_p.BarBack);
+            g.Clear(_p.Paper);
 
             if (_result.Hits.Count == 0)
             {
-                TextRenderer.DrawText(g, "没有找到匹配", _p.Small,
+                TextRenderer.DrawText(g, "没有找到匹配", _p.Chrome,
                     new Point(12, 12), _p.Muted);
                 return;
             }
@@ -101,20 +110,25 @@ namespace QuickNote
                 var y = (i - _firstVisible) * RowHeight;
                 if (i == _selected)
                 {
-                    using (var b = new SolidBrush(_p.Selection))
+                    using (var b = new SolidBrush(_danger ? Color.FromArgb(46, _p.Error) : _p.Selection))
                         g.FillRectangle(b, 0, y, Width, RowHeight - 2);
                 }
 
                 var hit = _result.Hits[i];
-                TextRenderer.DrawText(g, hit.Date.ToString("MM-dd dddd"), _p.Small,
-                    new Point(10, y + 4), _p.Muted);
 
-                DrawMatchLine(g, hit.Line, new Rectangle(10, y + 21, Width - 20, 20));
+                // 日期用第二套字体（Bahnschrift，DIN 系，数字有技术感），星期用 chrome 字号。
+                // 字号要比 CJK 大一档才压得住——Bahnschrift 的 x-height 偏小。
+                TextRenderer.DrawText(g, hit.Date.ToString("MM-dd"), _p.StampFont,
+                    new Point(10, y + 4), _p.Stamp);
+                TextRenderer.DrawText(g, hit.Date.ToString("dddd"), _p.Chrome,
+                    new Point(64, y + 6), _p.Muted);
+
+                DrawMatchLine(g, hit.Line, new Rectangle(10, y + 22, Width - 20, 20));
 
                 if (!string.IsNullOrEmpty(hit.Context))
                 {
-                    TextRenderer.DrawText(g, hit.Context, _p.Small,
-                        new Rectangle(10, y + 40, Width - 20, 18), _p.Muted,
+                    TextRenderer.DrawText(g, hit.Context, _p.Chrome,
+                        new Rectangle(10, y + 45, Width - 20, 18), _p.Muted,
                         TextFormatFlags.EndEllipsis);
                 }
             }
@@ -132,7 +146,7 @@ namespace QuickNote
 
             if (index < 0)
             {
-                TextRenderer.DrawText(g, line, _p.Body, box, _p.Text, TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, line, _p.Body, box, _p.Ink, TextFormatFlags.EndEllipsis);
                 return;
             }
 
@@ -148,7 +162,7 @@ namespace QuickNote
             if (beforeWidth > 0)
             {
                 TextRenderer.DrawText(g, before, _p.Body,
-                    new Rectangle(at, box.Y, beforeWidth, box.Height), _p.Text,
+                    new Rectangle(at, box.Y, beforeWidth, box.Height), _p.Ink,
                     TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             }
             at += beforeWidth;
@@ -157,17 +171,17 @@ namespace QuickNote
 
             var matchedWidth = TextRenderer.MeasureText(g, matched, _p.Body).Width;
             var drawMatched = Math.Min(matchedWidth, remaining);
-            using (var b = new SolidBrush(_p.Selection))
+            using (var b = new SolidBrush(_p.Highlight))
                 g.FillRectangle(b, at - 1, box.Y, drawMatched + 2, box.Height);
             TextRenderer.DrawText(g, matched, _p.Body,
-                new Rectangle(at, box.Y, drawMatched, box.Height), _p.Todo,
+                new Rectangle(at, box.Y, drawMatched, box.Height), _p.Ink,
                 TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
             at += drawMatched;
             remaining -= drawMatched;
             if (remaining <= 0 || after.Length == 0) return;
 
             TextRenderer.DrawText(g, after, _p.Body,
-                new Rectangle(at, box.Y, remaining, box.Height), _p.Text,
+                new Rectangle(at, box.Y, remaining, box.Height), _p.Ink,
                 TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
         }
 

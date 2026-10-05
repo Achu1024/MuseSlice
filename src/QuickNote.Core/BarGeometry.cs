@@ -3,6 +3,11 @@ namespace QuickNote.Core
     /// <summary>
     /// 小条高度的纯计算。单独抽出来是因为「粘贴一大段文本」这条路径：
     /// 没有上限的话小条会一路长高直到遮住整个屏幕。
+    /// <para>
+    /// 只钳行数，不再算总高度——一行到底多高由 RichEdit 自己的行距决定，
+    /// 写死在 Core 里的话换字体或换 DPI 就会对不上（字体一换，最后一行的
+    /// 下沿会被切掉，或者下面留出一块晾着的空当）。
+    /// </para>
     /// </summary>
     public static class BarGeometry
     {
@@ -21,12 +26,11 @@ namespace QuickNote.Core
             return textLength <= MaxHighlightChars;
         }
 
-        public static int HeightFor(int lineCount, int lineHeight, int chromeHeight)
+        public static int ClampLines(int lineCount)
         {
-            var lines = lineCount;
-            if (lines < MinLines) lines = MinLines;
-            if (lines > MaxLines) lines = MaxLines;
-            return chromeHeight + lines * lineHeight;
+            if (lineCount < MinLines) return MinLines;
+            if (lineCount > MaxLines) return MaxLines;
+            return lineCount;
         }
     }
 }

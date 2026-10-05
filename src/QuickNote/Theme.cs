@@ -1,23 +1,36 @@
+using System;
 using System.Drawing;
 using Microsoft.Win32;
 
 namespace QuickNote
 {
+    /// <summary>
+    /// 小条的配色与字体。
+    /// <para>
+    /// 立场（定案 §1）：这不是生产力看板，是一块掉落下来的便签。全界面近乎无彩，
+    /// **唯一的颜色来自那两个 emoji 脸**——所以没有强调色、没有待办橙。
+    /// 标题用字重区分，列表符是结构不是装饰，行内代码用 ink-soft 加等宽、不加底色
+    /// （RichEdit 画不出圆角底，方底更丑）。
+    /// </para>
+    /// </summary>
     internal sealed class Palette
     {
-        public Color BarBack;
-        public Color Border;
-        public Color Text;
-        public Color Muted;
-        public Color Accent;      // 标题、列表符
-        public Color Todo;        // - [ ] 待办
-        public Color Selection;
-        public Color Error;
+        public Color Paper;      // 小条底色
+        public Color Ink;        // 正文
+        public Color InkSoft;    // 次要正文、续行、行内代码
+        public Color Muted;      // 键位提示、状态文字、引用行
+        public Color Stamp;      // 时间戳——比 muted 还轻，退到背景里
+        public Color Hairline;   // 上下两条 chrome 的分隔线
+        public Color Selection;  // 选中行底纹（仅用于绘制，可带 alpha）
+        public Color Highlight;  // 搜索命中处底纹（仅用于绘制，可带 alpha）
+        public Color Error;      // 保存失败与删除确认。唯一被允许的彩色，是特例
 
-        public Font Body;
-        public Font HeadingFont;
-        public Font Mono;
-        public Font Small;
+        public Font Body;        // 正文
+        public Font StampFont;   // 时间戳。界面里唯一使用第二套字体的地方
+        public Font Chrome;      // 上下两条辅助信息行
+        public Font Heading;     // 标题（加粗，不是换色）
+        public Font Mono;        // 行内代码
+        public Font Emoji;       // 两个脸。不指定它的话会被正文 CJK 字体带去黑白字形
     }
 
     internal static class Theme
@@ -47,50 +60,81 @@ namespace QuickNote
 
         public static Palette Current(string themeSetting)
         {
-            var dark = ShouldUseDark(themeSetting);
-            return dark ? Dark() : Light();
+            return ShouldUseDark(themeSetting) ? Dark() : Light();
+        }
+
+        // 交给控件属性的颜色必须完全不透明（见接手须知）：WinForms 的 Control.BackColor
+        // 收到 alpha < 255 会直接抛 ArgumentException，在构造函数里就把进程打死。
+        // 只有纯 GDI+ 绘制的 Selection / Highlight 可以带 alpha。
+        private static Palette Light()
+        {
+            return new Palette
+            {
+                Paper = Rgb(0xFA, 0xFA, 0xF8),      // 近白微暖，不是奶油色
+                Ink = Rgb(0x23, 0x23, 0x26),
+                InkSoft = Rgb(0x55, 0x55, 0x5C),
+                Muted = Rgb(0x8E, 0x8E, 0x93),
+                Stamp = Rgb(0xA9, 0xA9, 0xAE),
+                Hairline = Rgb(0xE8, 0xE8, 0xE4),
+                Selection = Color.FromArgb(38, 0x23, 0x23, 0x26),
+                Highlight = Color.FromArgb(52, 0x23, 0x23, 0x26),
+                Error = Rgb(0x9C, 0x3A, 0x34),
+                Body = Font(CjkFamilies, 11f, FontStyle.Regular),
+                StampFont = Font(NumeralFamilies, 10.5f, FontStyle.Regular),
+                Chrome = Font(CjkFamilies, 8.5f, FontStyle.Regular),
+                Heading = Font(CjkFamilies, 11f, FontStyle.Bold),
+                Mono = Font(MonoFamilies, 10f, FontStyle.Regular),
+                Emoji = Font(EmojiFamilies, 11f, FontStyle.Regular)
+            };
         }
 
         private static Palette Dark()
         {
             return new Palette
             {
-                // 注意：交给控件（BackColor / ForeColor / SelectionColor）的颜色必须是
-                // 完全不透明的。WinForms 控件的 BackColor 收到 alpha < 255 会直接抛
-                // ArgumentException「控件不支持透明的背景色」，在构造函数里就把程序打死。
-                // 只有纯 GDI+ 绘制的颜色（Border、Selection）才允许带 alpha。
-                BarBack = Color.FromArgb(28, 28, 32),
-                Border = Color.FromArgb(38, 255, 255, 255),   // 仅用于绘制
-                Text = Color.FromArgb(232, 232, 234),
-                Muted = Color.FromArgb(135, 135, 138),
-                Accent = Color.FromArgb(124, 176, 255),
-                Todo = Color.FromArgb(240, 180, 94),
-                Selection = Color.FromArgb(60, 110, 168, 254),  // 仅用于绘制
-                Error = Color.FromArgb(255, 120, 120),
-                Body = new Font("Microsoft YaHei UI", 10.5f),
-                HeadingFont = new Font("Microsoft YaHei UI", 10.5f, FontStyle.Bold),
-                Mono = new Font("Consolas", 10f),
-                Small = new Font("Microsoft YaHei UI", 8.5f)
+                Paper = Rgb(0x1A, 0x1A, 0x1C),
+                Ink = Rgb(0xE8, 0xE8, 0xE6),
+                InkSoft = Rgb(0xB4, 0xB4, 0xB8),
+                Muted = Rgb(0x7E, 0x7E, 0x84),
+                Stamp = Rgb(0x6E, 0x6E, 0x74),
+                Hairline = Rgb(0x2C, 0x2C, 0x30),
+                Selection = Color.FromArgb(46, 0xE8, 0xE8, 0xE6),
+                Highlight = Color.FromArgb(64, 0xE8, 0xE8, 0xE6),
+                Error = Rgb(0xE0, 0x73, 0x6C),
+                Body = Font(CjkFamilies, 11f, FontStyle.Regular),
+                StampFont = Font(NumeralFamilies, 10.5f, FontStyle.Regular),
+                Chrome = Font(CjkFamilies, 8.5f, FontStyle.Regular),
+                Heading = Font(CjkFamilies, 11f, FontStyle.Bold),
+                Mono = Font(MonoFamilies, 10f, FontStyle.Regular),
+                Emoji = Font(EmojiFamilies, 11f, FontStyle.Regular)
             };
         }
 
-        private static Palette Light()
+        // Noto Sans SC 比雅黑 UI 开阔、字面更匀，不是系统默认脸。
+        private static readonly string[] CjkFamilies =
+            { "Noto Sans SC", "思源黑体", "Source Han Sans SC", "DengXian", "Microsoft YaHei UI" };
+
+        // Bahnschrift Light 是 DIN 系，数字有技术感，跟中文的人文气质拉开层次。
+        private static readonly string[] NumeralFamilies =
+            { "Bahnschrift Light", "Bahnschrift", "Consolas" };
+
+        private static readonly string[] MonoFamilies = { "Consolas", "Courier New" };
+        private static readonly string[] EmojiFamilies = { "Segoe UI Emoji" };
+
+        private static Color Rgb(int r, int g, int b) { return Color.FromArgb(r, g, b); }
+
+        /// <summary>
+        /// 按顺序取第一个装得上的字体。装不上时直接 new Font("不存在", ...) 会静默退回
+        /// Microsoft Sans Serif——中文用那个脸很难看，而且没有任何提示。
+        /// </summary>
+        private static Font Font(string[] families, float size, FontStyle style)
         {
-            return new Palette
+            foreach (var name in families)
             {
-                BarBack = Color.FromArgb(250, 250, 252),
-                Border = Color.FromArgb(30, 0, 0, 0),         // 仅用于绘制
-                Text = Color.FromArgb(28, 28, 32),
-                Muted = Color.FromArgb(122, 122, 126),
-                Accent = Color.FromArgb(28, 96, 200),
-                Todo = Color.FromArgb(176, 106, 16),
-                Selection = Color.FromArgb(50, 60, 130, 230),   // 仅用于绘制
-                Error = Color.FromArgb(190, 40, 40),
-                Body = new Font("Microsoft YaHei UI", 10.5f),
-                HeadingFont = new Font("Microsoft YaHei UI", 10.5f, FontStyle.Bold),
-                Mono = new Font("Consolas", 10f),
-                Small = new Font("Microsoft YaHei UI", 8.5f)
-            };
+                try { return new Font(name, size, style); }
+                catch (ArgumentException) { /* 这个家族不存在，试下一个 */ }
+            }
+            return new Font(FontFamily.GenericSansSerif, size, style);
         }
     }
 }

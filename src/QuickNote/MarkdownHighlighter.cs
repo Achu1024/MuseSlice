@@ -24,6 +24,10 @@ namespace QuickNote
         private static readonly Regex Bold = new Regex(@"\*\*[^*\n]+\*\*", RegexOptions.Compiled);
         private static readonly Regex Code = new Regex(@"`[^`\n]+`", RegexOptions.Compiled);
 
+        /// <summary>填写页那一行开头的脸（"😶‍🌫️ " / "🥳 "）。</summary>
+        private static readonly Regex FaceMarker = new Regex(
+            "^(" + EntryLine.UndoneFace + "|" + EntryLine.DoneFace + ")", RegexOptions.Compiled);
+
         public static void Apply(RichTextBox box, Palette p)
         {
             if (box == null || box.IsDisposed || !box.IsHandleCreated) return;
@@ -43,7 +47,7 @@ namespace QuickNote
             try
             {
                 box.SelectAll();
-                box.SelectionColor = p.Text;
+                box.SelectionColor = p.Ink;
                 box.SelectionFont = p.Body;
 
                 var text = box.Text;
@@ -80,9 +84,15 @@ namespace QuickNote
         {
             var line = text.Substring(start, end - start);
 
+            // 脸必须显式指定 emoji 字体。正文的 CJK 字体不含这些码位，
+            // 交给字体链接去兜的话有可能落到黑白字形上。
+            var face = FaceMarker.Match(line);
+            if (face.Success) Paint(box, start, face.Length, p.Ink, p.Emoji);
+
+            // 标题不用颜色，用字重（定案 §2 的「颜色的使用纪律」）。
             if (HeadingLine.IsMatch(line))
             {
-                Paint(box, start, line.Length, p.Accent, p.HeadingFont);
+                Paint(box, start, line.Length, p.Ink, p.Heading);
                 return;
             }
 
@@ -95,10 +105,10 @@ namespace QuickNote
             var todo = TodoMarker.Match(line);
             if (todo.Success)
             {
-                // 待办标记整段（含 "- [ ]"）用橙色，其余用正文色
+                // 手打的 "- [ ]"：不换色，只把它压成 ink-soft，让正文仍然是主角
                 var markerStart = start + todo.Groups[1].Length;
-                Paint(box, start, line.Length, p.Text, p.Body);
-                Paint(box, markerStart, todo.Groups[2].Length, p.Todo, p.Body);
+                Paint(box, start, line.Length, p.Ink, p.Body);
+                Paint(box, markerStart, todo.Groups[2].Length, p.InkSoft, p.Body);
             }
             else
             {
@@ -106,18 +116,19 @@ namespace QuickNote
                 if (bullet.Success)
                 {
                     var markerStart = start + bullet.Groups[1].Length;
-                    Paint(box, start, line.Length, p.Text, p.Body);
-                    Paint(box, markerStart, bullet.Groups[2].Length, p.Accent, p.Body);
+                    Paint(box, start, line.Length, p.Ink, p.Body);
+                    Paint(box, markerStart, bullet.Groups[2].Length, p.InkSoft, p.Body);
                 }
             }
 
             foreach (Match m in Bold.Matches(line))
             {
-                Paint(box, start + m.Index, m.Length, p.Text, p.HeadingFont);
+                Paint(box, start + m.Index, m.Length, p.Ink, p.Heading);
             }
             foreach (Match m in Code.Matches(line))
             {
-                Paint(box, start + m.Index, m.Length, p.Accent, p.Mono);
+                // 行内代码用 ink-soft + 等宽，不加底色——RichEdit 画不出圆角底，方底更丑
+                Paint(box, start + m.Index, m.Length, p.InkSoft, p.Mono);
             }
         }
 

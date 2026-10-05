@@ -14,8 +14,13 @@ namespace QuickNote
         private const int LogicalWidth = 560;
         private const int LogicalSearchWidth = 600;
         private const int LogicalSearchHeight = 470;
-        private const int LogicalLineHeight = 22;
-        private const int LogicalChrome = 90;
+
+        /// <summary>内边距。卡片四角的圆弧靠它让开，圆角才不会被内容压出直角。</summary>
+        private const int LogicalPadX = 16;
+        private const int LogicalPadY = 12;
+
+        /// <summary>上下两条辅助信息行的高度。</summary>
+        private const int LogicalChromeLine = 24;
 
         private Palette _palette;      // 非 readonly：改主题时要换掉
         private NoteStore _store;      // 非 readonly：改日记目录时要换掉
@@ -62,19 +67,18 @@ namespace QuickNote
             ShowInTaskbar = false;
             TopMost = true;
             StartPosition = FormStartPosition.Manual;
-            BackColor = palette.BarBack;
+            BackColor = palette.Paper;
             KeyPreview = true;
             DoubleBuffered = true;
 
-            AutoScaleMode = AutoScaleMode.None;   // 缩放由 _scale 显式负责
-            Padding = new Padding(14, 10, 14, 10);
+            AutoScaleMode = AutoScaleMode.None;   // 缩放由 _scale 显式负责；内边距在 ApplySize 里设
 
             _chrome = new BarChrome(palette);
             _input = BuildInput(palette);
             _results = BuildResults(palette);
             _searchRow = BuildSearchRow(palette);
 
-            _content = new Panel { Dock = DockStyle.Fill, BackColor = palette.BarBack };
+            _content = new Panel { Dock = DockStyle.Fill, BackColor = palette.Paper };
             _content.Controls.Add(_input);     // Fill 先加
             _content.Controls.Add(_results);   // 与 _input 互斥，同一时间只有一个可见
 
@@ -95,8 +99,8 @@ namespace QuickNote
             var box = new BarTextBox
             {
                 Dock = DockStyle.Fill,
-                BackColor = palette.BarBack,
-                ForeColor = palette.Text,
+                BackColor = palette.Paper,
+                ForeColor = palette.Ink,
                 Font = palette.Body
             };
             box.TextChangedByUser += delegate
@@ -118,7 +122,7 @@ namespace QuickNote
         {
             _searchStatus = new Label
             {
-                Font = palette.Small,
+                Font = palette.Chrome,
                 ForeColor = palette.Muted,
                 TextAlign = ContentAlignment.MiddleRight,
                 Dock = DockStyle.Right,
@@ -128,8 +132,8 @@ namespace QuickNote
             _queryBox = new TextBox
             {
                 BorderStyle = BorderStyle.None,
-                BackColor = palette.BarBack,
-                ForeColor = palette.Text,
+                BackColor = palette.Paper,
+                ForeColor = palette.Ink,
                 Font = palette.Body,
                 Dock = DockStyle.Fill
             };
@@ -152,23 +156,52 @@ namespace QuickNote
 
         // ---- 尺寸 ----
 
+        /// <summary>
+        /// 一行正文的实际高度，物理像素。
+        /// <para>
+        /// 取 RichEdit 自己的行高（<see cref="Font.Height"/> 就是它排版单倍行距时用的
+        /// 行距）再加一点呼吸，而不是写死一个逻辑常量：字体一换、DPI 一变，
+        /// 写死的值会让最后一行的下沿被切掉、或者留出一块晾着的空当。
+        /// </para>
+        /// </summary>
+        private int LineHeightPx
+        {
+            get
+            {
+                var font = _input.Font;
+                if (font == null) return (int)Math.Round(24 * _scale);
+                return font.Height + (int)Math.Round(4 * _scale);
+            }
+        }
+
+        private int ChromeLinePx { get { return (int)Math.Round(LogicalChromeLine * _scale); } }
+
         private void ApplySize()
         {
+            // 内边距与两条辅助行也要跟着 DPI 缩放。只缩窗体宽高而不缩它们的话，
+            // 文字按 DPI 放大了、留白却没放大，高 DPI 下整张卡片会显得局促。
+            var padX = (int)Math.Round(LogicalPadX * _scale);
+            var padY = (int)Math.Round(LogicalPadY * _scale);
+            Padding = new Padding(padX, padY, padX, padY);
+            _chrome.Top.Height = ChromeLinePx;
+            _chrome.Bottom.Height = ChromeLinePx;
+
             if (_mode == BarMode.Search)
             {
                 Width = (int)Math.Round(LogicalSearchWidth * _scale);
                 Height = (int)Math.Round(LogicalSearchHeight * _scale);
                 return;
             }
+
             Width = (int)Math.Round(LogicalWidth * _scale);
-            Height = (int)Math.Round(
-                BarGeometry.HeightFor(_lineCount, LogicalLineHeight, LogicalChrome) * _scale);
+            // 高度正好等于「上下内边距 + 上下辅助行 + N 行正文」，一点不多。
+            Height = 2 * padY + 2 * ChromeLinePx + _lineCount * LineHeightPx;
         }
 
         /// <summary>按内容行数调整高度。</summary>
         public void SetLineCount(int lineCount)
         {
-            _lineCount = lineCount;
+            _lineCount = BarGeometry.ClampLines(lineCount);
             ApplySize();
         }
 
@@ -212,7 +245,9 @@ namespace QuickNote
 
             try
             {
-                // Windows 11 让系统画圆角，比自绘 region 干净得多
+                // Windows 11 让系统画圆角，比自绘 region 干净得多。
+                // 半径是固定的物理像素（8px），560–700px 宽的卡片上用默认那档正合适；
+                // ROUNDSMALL 只有 4px，是在更小的表面上用的，用在这里会显得更方。
                 var pref = NativeMethods.DWMWCP_ROUND;
                 NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE,
                     ref pref, sizeof(int));
@@ -336,8 +371,7 @@ namespace QuickNote
             try { count = _store.CountEntries(today); }
             catch { /* 读不到就显示 0 条，不打扰使用者 */ }
 
-            return DateFormat.Heading(today).Substring(2)
-                + "　·　今天已记 " + count + " 条";
+            return DateFormat.ShortHeading(today) + "　·　今天已记 " + count + " 条";
         }
 
         private void RefreshChrome()
@@ -432,17 +466,18 @@ namespace QuickNote
         public void ApplyTheme(Palette palette)
         {
             _palette = palette;
-            BackColor = palette.BarBack;
-            _content.BackColor = palette.BarBack;
-            _input.BackColor = palette.BarBack;
-            _input.ForeColor = palette.Text;
+            BackColor = palette.Paper;
+            _content.BackColor = palette.Paper;
+            _input.BackColor = palette.Paper;
+            _input.ForeColor = palette.Ink;
             _input.Font = palette.Body;
-            _queryBox.BackColor = palette.BarBack;
-            _queryBox.ForeColor = palette.Text;
+            _queryBox.BackColor = palette.Paper;
+            _queryBox.ForeColor = palette.Ink;
             _queryBox.Font = palette.Body;
             _chrome.Top.ForeColor = palette.Muted;
             _chrome.Bottom.ForeColor = palette.Muted;
             _searchStatus.ForeColor = palette.Muted;
+            _chrome.ApplyHairline(palette.Hairline);
             MarkdownHighlighter.Apply(_input, palette);
             Invalidate(true);
         }
