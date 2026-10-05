@@ -41,6 +41,9 @@ namespace QuickNote
         private string _draft = "";
 
         private string _lastQuery = "";
+
+        /// <summary>删除确认态。Backspace 进入，Enter 真删，Esc 取消。</summary>
+        private bool _confirmDelete;
         private SearchResult _lastResult = SearchResult.Empty();
 
         /// <summary>仅在保存出错后短暂启用，用来把红字提示恢复成常规提示。平时不跑。</summary>
@@ -421,7 +424,8 @@ namespace QuickNote
             if (_mode == BarMode.Search)
             {
                 _chrome.Top.Text = "搜索条目";
-                _chrome.Bottom.Text = "↑↓ 选择　·　空格 完成　·　Enter 打开　·　Tab 返回";
+                if (_confirmDelete) return;      // 确认文案由 EnterDeleteConfirm 负责，别覆盖掉
+                _chrome.Bottom.Text = "↑↓ 选择　·　空格 完成　·　Backspace 删除　·　Enter 打开　·　Tab 返回";
             }
             else
             {
@@ -434,22 +438,95 @@ namespace QuickNote
 
         private void OnSearchKeyDown(object sender, KeyEventArgs e)
         {
-            if (InputRules.DecideSearchKey(_queryBox.Text, false, ToSearchKey(e.KeyCode))
-                == SearchKeyAction.ToggleDone)
+            if (e.KeyCode == Keys.Down) { _results.MoveSelection(1); e.SuppressKeyPress = true; return; }
+            if (e.KeyCode == Keys.Up) { _results.MoveSelection(-1); e.SuppressKeyPress = true; return; }
+
+            // 先判 action 再判键本身：Esc 在非确认态走「切回填写」，在确认态走「取消」。
+            // 反过来写的话 Esc 会直接切模式，确认态永远退不出来。
+            var action = InputRules.DecideSearchKey(_queryBox.Text, _confirmDelete, ToSearchKey(e.KeyCode));
+
+            if (action == SearchKeyAction.ToggleDone)
             {
                 e.SuppressKeyPress = true;
                 ToggleSelected();
                 return;
             }
+            if (action == SearchKeyAction.AskDelete)
+            {
+                e.SuppressKeyPress = true;
+                EnterDeleteConfirm();
+                return;
+            }
+            if (action == SearchKeyAction.ConfirmDelete)
+            {
+                e.SuppressKeyPress = true;
+                DoDelete();
+                return;
+            }
+            if (action == SearchKeyAction.CancelDelete)
+            {
+                e.SuppressKeyPress = true;
+                CancelDeleteConfirm();
+                return;
+            }
 
-            if (e.KeyCode == Keys.Down) { _results.MoveSelection(1); e.SuppressKeyPress = true; return; }
-            if (e.KeyCode == Keys.Up) { _results.MoveSelection(-1); e.SuppressKeyPress = true; return; }
             if (e.KeyCode == Keys.Enter) { _results.ActivateSelected(); e.SuppressKeyPress = true; return; }
             if (e.KeyCode == Keys.Tab || e.KeyCode == Keys.Escape)
             {
                 e.SuppressKeyPress = true;
                 SwitchTo(BarMode.Record);
             }
+        }
+
+        private void EnterDeleteConfirm()
+        {
+            if (_results.SelectedHit == null) return;
+            _confirmDelete = true;
+            _results.SetDanger(true);
+
+            EntryInfo info;
+            EntryLine.TryParse(_results.SelectedHit.Line, out info);
+            var what = info == null ? _results.SelectedHit.Line : info.Content;
+            if (what.Length > 20) what = what.Substring(0, 20) + "…";
+
+            _chrome.Bottom.Text = "删除「" + what + "」？　Enter 确认　·　Esc 取消";
+            _chrome.Bottom.ForeColor = _palette.Error;
+        }
+
+        private void CancelDeleteConfirm()
+        {
+            if (!_confirmDelete) return;
+            _confirmDelete = false;
+            _results.SetDanger(false);
+            _chrome.Bottom.ForeColor = _palette.Muted;
+            RefreshChrome();
+        }
+
+        /// <summary>
+        /// 真删。删除要重写当天文件——spec 第 5 节靠「只追加」换来的「崩溃不丢前面
+        /// 内容」在这条路径上没有了，所以 NoteStore 用临时文件 + 原子替换，
+        /// 并在当天首次改写前留一份 .bak。
+        /// </summary>
+        private void DoDelete()
+        {
+            var hit = _results.SelectedHit;
+            if (hit == null) { CancelDeleteConfirm(); return; }
+
+            try
+            {
+                if (!_store.DeleteEntry(hit.Date, hit.LineNumber, hit.Line))
+                {
+                    _searchStatus.Text = "这条记录已经变了，已重新载入";
+                }
+            }
+            catch (NoteStoreException ex)
+            {
+                QuickNoteApp.Log(ex.Message);
+                _searchStatus.Text = "删除失败：" + ex.Message;
+            }
+
+            CancelDeleteConfirm();
+            _search.Query(_lastQuery);
         }
 
         private static SearchKey ToSearchKey(Keys key)
@@ -510,6 +587,7 @@ namespace QuickNote
 
         private void SwitchTo(BarMode mode)
         {
+            CancelDeleteConfirm();   // 切模式的瞬间确认态必须失效，否则 Enter 会删掉看不见的东西
             _mode = mode;
             var searching = mode == BarMode.Search;
 
@@ -550,6 +628,7 @@ namespace QuickNote
             _lastResult = SearchResult.Empty();
             _queryBox.Text = "";
             _results.SetResult(_lastResult, "");
+            CancelDeleteConfirm();
             RefreshChrome();
         }
 
@@ -599,6 +678,7 @@ namespace QuickNote
 
         public void CloseBar()
         {
+            CancelDeleteConfirm();
             _draft = _input.Text;              // 记录模式草稿保留
             _search.Cancel();
             _lastQuery = "";                   // 搜索词与结果在小条隐藏时丢弃

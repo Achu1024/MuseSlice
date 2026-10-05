@@ -28,6 +28,33 @@ namespace QuickNote.SelfCheck
             SetDoneFlipsOnlyThatLine();
             RefusesStaleLineNumber();
             SecondDeleteKeepsFirstBackup();
+            RewritesBomFileAndKeepsOtherLines();
+        }
+
+        private static void RewritesBomFileAndKeepsOtherLines()
+        {
+            using (var dir = new TempDir())
+            {
+                var store = new NoteStore(dir.Path);
+                var path = store.PathFor(Day);
+
+                // 使用者现有的笔记里确实有带 BOM 的（早先的编辑器留下的）。
+                // 删除要能照样工作，且不能把 BOM 变成一个乱码字符混进标题行。
+                File.WriteAllBytes(path, new UTF8Encoding(true).GetBytes(
+                    "# 2026-10-05 星期一\n\n- 20:18 下载Minimax\n\n- 21:00 另一条\n\n"));
+
+                Check.That(store.DeleteEntry(Day, 3, "- 20:18 下载Minimax"),
+                    "带 BOM 的旧文件也能按行号删除");
+                Check.Equal(store.CountEntries(Day), 1, "只删掉了那一条，另一条还在");
+
+                var text = File.ReadAllText(path, Encoding.UTF8);
+                Check.Equal(text, "# 2026-10-05 星期一\n\n- 21:00 另一条\n\n",
+                    "删完之后剩下的内容与预期完全一致，标题行没被 BOM 污染");
+
+                var bytes = File.ReadAllBytes(path);
+                Check.That(!(bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF),
+                    "重写后的文件不带 BOM");
+            }
         }
 
         private static void RewritesAtomically()
