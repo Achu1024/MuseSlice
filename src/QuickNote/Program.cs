@@ -12,11 +12,13 @@ namespace QuickNote
         private readonly TrayIcon _tray;
         private readonly MessageWindow _messageWindow;
         private HotkeyManager _hotkeys;
+        private NoteStore _store;      // 非 readonly：Task 13 改日记目录时要换掉
         private CaptureBar _bar;
 
         public QuickNoteApp()
         {
             _config = AppConfig.Load(AppConfig.DefaultConfigPath());
+            _store = new NoteStore(_config.NotesDir);
 
             var showMessage = NativeMethods.RegisterWindowMessage("QuickNote.Show");
             _messageWindow = new MessageWindow(showMessage);
@@ -28,7 +30,7 @@ namespace QuickNote
             _tray.OpenNotesFolderRequested += OpenNotesFolder;
             _tray.ExitRequested += ExitApp;
 
-            _bar = new CaptureBar(Theme.Current(_config.Theme));
+            _bar = new CaptureBar(Theme.Current(_config.Theme), _store);
 
             _hotkeys = new HotkeyManager(_config);
             _hotkeys.Degraded += delegate (string reason)
@@ -41,7 +43,7 @@ namespace QuickNote
         private void ShowBar()
         {
             if (_bar == null) return;
-            _bar.ShowBar();
+            _bar.OpenBar();
         }
 
         private void OpenToday()
@@ -65,7 +67,15 @@ namespace QuickNote
 
         private void ExitApp()
         {
-            // Task 11 会给它加上「有未保存草稿时先询问」。
+            // 直接退出会把使用者写了三行还没保存的东西丢掉，先问一句。
+            var draft = _bar == null ? "" : _bar.Draft;
+            if (draft.Trim().Length > 0)
+            {
+                var answer = MessageBox.Show(
+                    "还有没保存的内容：\n\n" + draft + "\n\n要退出吗？（退出后这些内容会丢失）",
+                    "QuickNote", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (answer != DialogResult.Yes) return;
+            }
             ExitThread();
         }
 

@@ -17,6 +17,14 @@ namespace QuickNote
 
         private readonly Palette _palette;
         private readonly BarTextBox _input;
+        private readonly NoteStore _store;
+        private readonly BarChrome _chrome;
+
+        /// <summary>记录模式的草稿。Esc 与失焦都不清空它，只有保存成功或使用者手动删除才清。</summary>
+        private string _draft = "";
+
+        /// <summary>仅在保存出错后短暂启用，用来把红字提示恢复成常规提示。平时不跑。</summary>
+        private Timer _errorReset;
 
         /// <summary>
         /// 显示器 DPI / 96。尺寸常量都按 96 DPI 写，实际用之前乘上它。
@@ -31,9 +39,10 @@ namespace QuickNote
 
         private int _lineCount = BarGeometry.MinLines;
 
-        public CaptureBar(Palette palette)
+        public CaptureBar(Palette palette, NoteStore store)
         {
             _palette = palette;
+            _store = store;
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -45,6 +54,8 @@ namespace QuickNote
 
             AutoScaleMode = AutoScaleMode.None;   // 缩放由 _scale 显式负责
             Padding = new Padding(14, 10, 14, 10);
+
+            _chrome = new BarChrome(palette);
 
             _input = new BarTextBox
             {
@@ -58,10 +69,18 @@ namespace QuickNote
                 MarkdownHighlighter.Apply(_input, _palette);
                 FitToContent();
             };
+
+            // Fill 必须先加：WinForms 从 z-order 末尾往前停靠，
+            // 先加的 Fill 最后停靠，上下两条才能在它之外占据各自的空间。
             Controls.Add(_input);
+            Controls.Add(_chrome.Top);
+            Controls.Add(_chrome.Bottom);
 
             ApplySize();
         }
+
+        /// <summary>记录模式的草稿（未保存的内容）。退出前要拿它问一句。</summary>
+        public string Draft { get { return _input.Text; } }
 
         private void ApplySize()
         {
@@ -128,6 +147,129 @@ namespace QuickNote
             Top = wa.Top + wa.Height / 3;
         }
 
+        // ---- 键位 ----
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+
+            if (e.KeyCode == Keys.Enter)
+            {
+                var action = InputRules.DecideEnter(_input.IsComposing, e.Shift);
+                if (action == EnterAction.Ignore) { e.SuppressKeyPress = true; return; }
+                if (action == EnterAction.Newline) return;      // 交给控件插入换行
+                e.SuppressKeyPress = true;
+                Save();
+                return;
+            }
+
+            if (e.KeyCode == Keys.Escape)
+            {
+                e.SuppressKeyPress = true;
+                CloseBar();     // 隐藏但不清空：写过三行东西误按一下全没了最劝退
+                return;
+            }
+
+            if (e.KeyCode == Keys.Tab)
+            {
+                var tab = InputRules.DecideTab(BarMode.Record, _input.TextLength == 0);
+                e.SuppressKeyPress = true;
+                if (tab == TabAction.Indent) InsertIndent();
+                // SwitchToSearch 由 Task 12 接管
+                return;
+            }
+        }
+
+        private void InsertIndent()
+        {
+            _input.SelectedText = new string(' ', InputRules.IndentWidth);
+        }
+
+        // ---- 保存 ----
+
+        /// <summary>返回 true 表示已保存并清空。</summary>
+        public bool Save()
+        {
+            var text = _input.Text;
+            if (text.Trim().Length == 0)
+            {
+                HideBar();    // 空输入直接关掉，不创建文件、不留痕迹
+                return false;
+            }
+
+            try
+            {
+                _store.Append(text, DateTime.Now);
+                _input.Clear();
+                _draft = "";
+                _chrome.Bottom.ForeColor = _palette.Muted;
+                RefreshChrome();
+                HideBar();
+                return true;
+            }
+            catch (NoteStoreException ex)
+            {
+                // 最关键的一条：内容绝不清空。让使用者能把内容复制走。
+                QuickNoteApp.Log(ex.Message);
+                _chrome.Bottom.Text = "保存失败，内容已保留：" + ex.Message;
+                _chrome.Bottom.ForeColor = _palette.Error;
+                StartErrorReset();
+                return false;
+            }
+        }
+
+        private void StartErrorReset()
+        {
+            if (_errorReset == null)
+            {
+                _errorReset = new Timer { Interval = 6000 };
+                _errorReset.Tick += delegate
+                {
+                    _errorReset.Stop();
+                    _chrome.Bottom.ForeColor = _palette.Muted;
+                    RefreshChrome();
+                };
+            }
+            _errorReset.Stop();
+            _errorReset.Start();
+        }
+
+        public string TopText()
+        {
+            var today = DateTime.Now;
+            var count = 0;
+            try { count = _store.CountEntries(today); }
+            catch { /* 读不到就显示 0 条，不打扰使用者 */ }
+
+            return DateFormat.Heading(today).Substring(2)
+                + "　·　今天已记 " + count + " 条";
+        }
+
+        private void RefreshChrome()
+        {
+            _chrome.Top.Text = TopText();
+            _chrome.Bottom.Text = "Enter 保存　·　Shift+Enter 换行　·　Tab 搜索";
+        }
+
+        // ---- 进出 ----
+
+        public void OpenBar()
+        {
+            RefreshChrome();
+            _input.Text = _draft;
+            _input.SelectionStart = _input.TextLength;
+            MarkdownHighlighter.Apply(_input, _palette);
+            FitToContent();
+            ShowBar();
+            _input.Focus();
+        }
+
+        public void CloseBar()
+        {
+            _draft = _input.Text;      // Esc 与失焦都不清空草稿
+            HideBar();
+        }
+
         public void ShowBar()
         {
             Reposition();
@@ -143,7 +285,7 @@ namespace QuickNote
         protected override void OnDeactivate(EventArgs e)
         {
             base.OnDeactivate(e);
-            HideBar();   // 失焦隐藏但不清空内容，防手滑
+            CloseBar();   // 失焦隐藏但不清空内容，防手滑
         }
     }
 }
