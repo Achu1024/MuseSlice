@@ -323,7 +323,7 @@ namespace QuickNote.SelfCheck
             Check.Equal(DateFormat.Stamp(t), "14:03", "时间戳 24 小时制、分钟补零");
 
             var zh = CultureInfo.GetCultureInfo("zh-CN");
-            Check.Equal(DateFormat.Heading(t, zh), "# 2026-10-05 星期日", "标题行含中文星期");
+            Check.Equal(DateFormat.Heading(t, zh), "# 2026-10-05 星期一", "标题行含中文星期");
 
             Check.Equal(DateFormat.Stamp(new DateTime(2026, 1, 1, 0, 0, 0)), "00:00",
                 "零点显示为 00:00 而不是 24:00");
@@ -378,7 +378,7 @@ namespace QuickNote.Core
             return Heading(when, CultureInfo.CurrentCulture);
         }
 
-        /// <summary>文件首行，例如「# 2026-10-05 星期日」。星期名随传入文化。</summary>
+        /// <summary>文件首行，例如「# 2026-10-05 星期一」。星期名随传入文化。</summary>
         public static string Heading(DateTime when, CultureInfo culture)
         {
             return "# " + FileName(when) + " " + when.ToString("dddd", culture);
@@ -487,7 +487,7 @@ namespace QuickNote.SelfCheck
                 var text = File.ReadAllText(store.PathFor(Day), Encoding.UTF8);
 
                 Check.That(wrote, "首次写入返回 true");
-                Check.Equal(text, "# 2026-10-05 星期日\n\n- 14:30 跟老王确认了接口字段\n\n",
+                Check.Equal(text, "# 2026-10-05 星期一\n\n- 14:30 跟老王确认了接口字段\n\n",
                     "新文件含标题行、时间戳前缀与结尾空行");
             }
         }
@@ -502,7 +502,7 @@ namespace QuickNote.SelfCheck
                 var text = File.ReadAllText(store.PathFor(Day), Encoding.UTF8);
 
                 Check.Equal(text,
-                    "# 2026-10-05 星期日\n\n- 14:30 第一条\n\n- 14:32 第二条\n\n",
+                    "# 2026-10-05 星期一\n\n- 14:30 第一条\n\n- 14:32 第二条\n\n",
                     "追加不重复写标题行，两条记录各自带时间戳");
             }
         }
@@ -532,7 +532,7 @@ namespace QuickNote.SelfCheck
                 var text = File.ReadAllText(store.PathFor(Day), Encoding.UTF8);
 
                 Check.Equal(text,
-                    "# 2026-10-05 星期日\n\n- 14:30 第一行\n## 下午计划\n- [ ] 把 spec 写完\n\n",
+                    "# 2026-10-05 星期一\n\n- 14:30 第一行\n## 下午计划\n- [ ] 把 spec 写完\n\n",
                     "多行内容仅首行带时间戳，后续行原样不缩进");
             }
         }
@@ -579,7 +579,7 @@ namespace QuickNote.SelfCheck
                 Check.That(File.Exists(Path.Combine(cn, "2026-10-05.md")),
                     "目录名含中文与空格时正常创建并写入");
                 Check.Equal(File.ReadAllText(Path.Combine(cn, "2026-10-05.md"), Encoding.UTF8),
-                    "# 2026-10-05 星期日\n\n- 14:30 路径含中文与空格\n\n",
+                    "# 2026-10-05 星期一\n\n- 14:30 路径含中文与空格\n\n",
                     "中文路径下内容正确");
             }
         }
@@ -1500,7 +1500,7 @@ namespace QuickNote.SelfCheck
         {
             using (var dir = new TempDir())
             {
-                Write(dir.Path, "2026-10-05.md", "# 2026-10-05 星期日", "", "- 14:30 老王");
+                Write(dir.Path, "2026-10-05.md", "# 2026-10-05 星期一", "", "- 14:30 老王");
                 var store = new NoteStore(dir.Path);
 
                 var a = NoteSearcher.Search(dir.Path, "", NoteSearcher.DefaultLimit, CancellationToken.None);
@@ -1559,7 +1559,7 @@ namespace QuickNote.SelfCheck
             using (var dir = new TempDir())
             {
                 Write(dir.Path, "2026-10-05.md",
-                    "# 2026-10-05 星期日",
+                    "# 2026-10-05 星期一",
                     "",
                     "- 14:30 跟老王确认了接口字段",
                     "他那边说字段名要改成 snake_case",
