@@ -11,6 +11,7 @@ namespace QuickNote.SelfCheck
             try
             {
                 DateFormatChecks.Run();
+                EntryLineChecks.Run();
                 NoteStoreChecks.Run();
                 AppConfigChecks.Run();
                 InputRulesChecks.Run();

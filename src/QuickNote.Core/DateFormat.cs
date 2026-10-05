@@ -36,27 +36,17 @@ namespace QuickNote.Core
             return "- " + Stamp(when) + " ";
         }
 
-        /// <summary>
-        /// 判断一行是否是程序生成的记录起始行。
-        /// <para>
-        /// 不能只看 "- "：多行记录的续行是使用者原样写入的，如果他自己写了一个
-        /// 顶层列表项，那一行也会以 "- " 开头。唯一可靠的标志是程序生成的
-        /// 时间戳前缀 —— 短横、空格、两位小时、冒号、两位分钟、空格。
-        /// </para>
-        /// </summary>
-        public static bool IsEntryStart(string line)
+        /// <summary>顶部 chrome 用的短标题，例如「10-05 星期一」。不带年份。</summary>
+        public static string ShortHeading(DateTime when)
         {
-            if (line == null || line.Length < 8) return false;
-            if (line[0] != '-' || line[1] != ' ') return false;
-            if (!IsDigit(line[2]) || !IsDigit(line[3])) return false;
-            if (line[4] != ':') return false;
-            if (!IsDigit(line[5]) || !IsDigit(line[6])) return false;
-            return line[7] == ' ';
+            return when.ToString("MM-dd", CultureInfo.InvariantCulture)
+                + " " + when.ToString("dddd", CultureInfo.CurrentCulture);
         }
 
-        private static bool IsDigit(char c)
+        /// <summary>判断一行是否是程序生成的记录起始行。格式细节见 <see cref="EntryLine"/>。</summary>
+        public static bool IsEntryStart(string line)
         {
-            return c >= '0' && c <= '9';
+            return EntryLine.IsEntryStart(line);
         }
     }
 }

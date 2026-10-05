@@ -25,6 +25,10 @@ namespace QuickNote.SelfCheck
 
             Check.Equal(DateFormat.EntryPrefix(t), "- 14:03 ", "记录行前缀格式");
 
+            Check.Equal(DateFormat.ShortHeading(t), "10-05 星期一", "顶部 chrome 用的短标题不带年份");
+            Check.That(DateFormat.IsEntryStart("- [ ] 14:03 新格式"), "新格式的记录行也能识别");
+            Check.That(!DateFormat.IsEntryStart("- [ ] 待办"), "手打的待办列表项仍然不是记录行");
+
             Check.That(DateFormat.IsEntryStart("- 14:03 跟老王确认了接口字段"),
                 "识别程序生成的记录行");
             Check.That(DateFormat.IsEntryStart("- 00:00 零点"),
