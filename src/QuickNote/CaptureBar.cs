@@ -6,22 +6,36 @@ using QuickNote.Core;
 namespace QuickNote
 {
     /// <summary>
-    /// 悬浮小条。无边框、置顶、不进任务栏、带投影与圆角。
+    /// 悬浮小条。无边框、置顶、不进任务栏、带投影与圆角。同一窗口两种模式。
     /// </summary>
     internal sealed class CaptureBar : Form
     {
         /// <summary>设计基准尺寸（96 DPI 下的逻辑像素）。</summary>
         private const int LogicalWidth = 560;
+        private const int LogicalSearchWidth = 600;
+        private const int LogicalSearchHeight = 470;
         private const int LogicalLineHeight = 22;
         private const int LogicalChrome = 90;
 
         private readonly Palette _palette;
-        private readonly BarTextBox _input;
         private readonly NoteStore _store;
         private readonly BarChrome _chrome;
 
+        private readonly Panel _content;          // 两种模式互斥的内容区
+        private readonly BarTextBox _input;
+        private readonly SearchResultsView _results;
+        private readonly Panel _searchRow;
+        private readonly SearchController _search;
+        private TextBox _queryBox;      // 由 BuildSearchRow 赋值
+        private Label _searchStatus;    // 由 BuildSearchRow 赋值
+
+        private BarMode _mode = BarMode.Record;
+
         /// <summary>记录模式的草稿。Esc 与失焦都不清空它，只有保存成功或使用者手动删除才清。</summary>
         private string _draft = "";
+
+        private string _lastQuery = "";
+        private SearchResult _lastResult = SearchResult.Empty();
 
         /// <summary>仅在保存出错后短暂启用，用来把红字提示恢复成常规提示。平时不跑。</summary>
         private Timer _errorReset;
@@ -56,34 +70,96 @@ namespace QuickNote
             Padding = new Padding(14, 10, 14, 10);
 
             _chrome = new BarChrome(palette);
+            _input = BuildInput(palette);
+            _results = BuildResults(palette);
+            _searchRow = BuildSearchRow(palette);
 
-            _input = new BarTextBox
+            _content = new Panel { Dock = DockStyle.Fill, BackColor = palette.BarBack };
+            _content.Controls.Add(_input);     // Fill 先加
+            _content.Controls.Add(_results);   // 与 _input 互斥，同一时间只有一个可见
+
+            // 停靠顺序由 z-order 决定：WinForms 从末尾往前停靠，先加的 Fill 最后停靠。
+            // 所以 Fill 必须最先加，上下各条才能在它之外拿到自己的空间。
+            Controls.Add(_content);
+            Controls.Add(_searchRow);
+            Controls.Add(_chrome.Bottom);
+            Controls.Add(_chrome.Top);
+
+            _search = new SearchController(this, _store.NotesDir, OnSearchResult, OnSearchStarted);
+
+            ApplySize();
+        }
+
+        private BarTextBox BuildInput(Palette palette)
+        {
+            var box = new BarTextBox
             {
                 Dock = DockStyle.Fill,
                 BackColor = palette.BarBack,
                 ForeColor = palette.Text,
                 Font = palette.Body
             };
-            _input.TextChangedByUser += delegate
+            box.TextChangedByUser += delegate
             {
-                MarkdownHighlighter.Apply(_input, _palette);
+                MarkdownHighlighter.Apply(box, _palette);
                 FitToContent();
             };
+            return box;
+        }
 
-            // Fill 必须先加：WinForms 从 z-order 末尾往前停靠，
-            // 先加的 Fill 最后停靠，上下两条才能在它之外占据各自的空间。
-            Controls.Add(_input);
-            Controls.Add(_chrome.Top);
-            Controls.Add(_chrome.Bottom);
+        private SearchResultsView BuildResults(Palette palette)
+        {
+            var view = new SearchResultsView(palette) { Dock = DockStyle.Fill, Visible = false };
+            view.Activated += OpenHit;
+            return view;
+        }
 
-            ApplySize();
+        private Panel BuildSearchRow(Palette palette)
+        {
+            _searchStatus = new Label
+            {
+                Font = palette.Small,
+                ForeColor = palette.Muted,
+                TextAlign = ContentAlignment.MiddleRight,
+                Dock = DockStyle.Right,
+                Width = 210
+            };
+
+            _queryBox = new TextBox
+            {
+                BorderStyle = BorderStyle.None,
+                BackColor = palette.BarBack,
+                ForeColor = palette.Text,
+                Font = palette.Body,
+                Dock = DockStyle.Fill
+            };
+            _queryBox.TextChanged += delegate
+            {
+                _lastQuery = _queryBox.Text;
+                _search.Query(_lastQuery);
+            };
+            _queryBox.KeyDown += OnSearchKeyDown;
+
+            // 查询框与右侧状态同一行：先加 Fill 再加 Right，Right 才会贴右边。
+            var row = new Panel { Dock = DockStyle.Top, Height = 26, Visible = false };
+            row.Controls.Add(_queryBox);
+            row.Controls.Add(_searchStatus);
+            return row;
         }
 
         /// <summary>记录模式的草稿（未保存的内容）。退出前要拿它问一句。</summary>
         public string Draft { get { return _input.Text; } }
 
+        // ---- 尺寸 ----
+
         private void ApplySize()
         {
+            if (_mode == BarMode.Search)
+            {
+                Width = (int)Math.Round(LogicalSearchWidth * _scale);
+                Height = (int)Math.Round(LogicalSearchHeight * _scale);
+                return;
+            }
             Width = (int)Math.Round(LogicalWidth * _scale);
             Height = (int)Math.Round(
                 BarGeometry.HeightFor(_lineCount, LogicalLineHeight, LogicalChrome) * _scale);
@@ -98,6 +174,7 @@ namespace QuickNote
 
         private void FitToContent()
         {
+            if (_mode != BarMode.Record) return;
             // 走 SetLineCount 而不是直接改 Height：尺寸常量是 96 DPI 的逻辑值，
             // 乘缩放系数的事由 ApplySize 统一负责，绕过它就会在高 DPI 下偏小。
             SetLineCount(_input.Lines.Length);
@@ -147,11 +224,12 @@ namespace QuickNote
             Top = wa.Top + wa.Height / 3;
         }
 
-        // ---- 键位 ----
+        // ---- 记录模式的键位 ----
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
+            if (_mode != BarMode.Record) return;
 
             if (e.KeyCode == Keys.Enter)
             {
@@ -175,7 +253,7 @@ namespace QuickNote
                 var tab = InputRules.DecideTab(BarMode.Record, _input.TextLength == 0);
                 e.SuppressKeyPress = true;
                 if (tab == TabAction.Indent) InsertIndent();
-                // SwitchToSearch 由 Task 12 接管
+                else if (tab == TabAction.SwitchToSearch) SwitchTo(BarMode.Search);
                 return;
             }
         }
@@ -247,15 +325,90 @@ namespace QuickNote
 
         private void RefreshChrome()
         {
-            _chrome.Top.Text = TopText();
-            _chrome.Bottom.Text = "Enter 保存　·　Shift+Enter 换行　·　Tab 搜索";
+            if (_mode == BarMode.Search)
+            {
+                _chrome.Top.Text = "搜索日记";
+                _chrome.Bottom.Text = "↑↓ 选择　·　Enter 打开　·　Tab 返回";
+            }
+            else
+            {
+                _chrome.Top.Text = TopText();
+                _chrome.Bottom.Text = "Enter 保存　·　Shift+Enter 换行　·　Tab 搜索";
+            }
+        }
+
+        // ---- 搜索模式 ----
+
+        private void OnSearchKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Down) { _results.MoveSelection(1); e.SuppressKeyPress = true; return; }
+            if (e.KeyCode == Keys.Up) { _results.MoveSelection(-1); e.SuppressKeyPress = true; return; }
+            if (e.KeyCode == Keys.Enter) { _results.ActivateSelected(); e.SuppressKeyPress = true; return; }
+            if (e.KeyCode == Keys.Tab || e.KeyCode == Keys.Escape)
+            {
+                e.SuppressKeyPress = true;
+                SwitchTo(BarMode.Record);
+            }
+        }
+
+        private void OnSearchStarted()
+        {
+            _searchStatus.Text = "搜索中…";
+        }
+
+        private void OnSearchResult(SearchResult result)
+        {
+            _lastResult = result;
+            _results.SetResult(result, _lastQuery);
+            _searchStatus.Text = result.Hits.Count + " 条"
+                + (result.Truncated ? "（已截断）" : "")
+                + "　·　扫描 " + result.ScannedFiles + " 个文件"
+                + (result.UnreadableFiles > 0 ? "，跳过 " + result.UnreadableFiles + " 个无法读取" : "");
+        }
+
+        private void SwitchTo(BarMode mode)
+        {
+            _mode = mode;
+            var searching = mode == BarMode.Search;
+
+            _input.Visible = !searching;
+            _results.Visible = searching;
+            _searchRow.Visible = searching;
+
+            if (searching)
+            {
+                ApplySize();
+                Reposition();
+                _queryBox.Text = _lastQuery;          // 沿用上次查询词，避免反复输入
+                _queryBox.SelectionStart = _queryBox.TextLength;
+                _results.SetResult(_lastResult, _lastQuery);
+                RefreshChrome();
+                _queryBox.Focus();
+            }
+            else
+            {
+                ApplySize();
+                Reposition();
+                RefreshChrome();
+                _input.Focus();
+            }
+        }
+
+        private static void OpenHit(SearchHit hit)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo(hit.FilePath) { UseShellExecute = true });
+            }
+            catch (Exception ex) { QuickNoteApp.Log("打开 " + hit.FilePath + " 失败：" + ex.Message); }
         }
 
         // ---- 进出 ----
 
         public void OpenBar()
         {
-            RefreshChrome();
+            SwitchTo(BarMode.Record);          // 默认进记录模式，不记忆上次
             _input.Text = _draft;
             _input.SelectionStart = _input.TextLength;
             MarkdownHighlighter.Apply(_input, _palette);
@@ -266,7 +419,13 @@ namespace QuickNote
 
         public void CloseBar()
         {
-            _draft = _input.Text;      // Esc 与失焦都不清空草稿
+            _draft = _input.Text;              // 记录模式草稿保留
+            _search.Cancel();
+            _lastQuery = "";                   // 搜索词与结果在小条隐藏时丢弃
+            _lastResult = SearchResult.Empty();
+            _queryBox.Text = "";
+            _results.SetResult(_lastResult, "");
+            if (_mode == BarMode.Search) SwitchTo(BarMode.Record);
             HideBar();
         }
 
