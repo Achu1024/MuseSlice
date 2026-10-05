@@ -248,3 +248,62 @@ spec 第 5 节刻意选了「追加，不重写整个文件」——理由是中
 
 注意 `Enter` 在搜索页是「打开文件」而在确认态是「确认删除」——确认态下
 Enter 的语义被覆盖。这是有意的：确认态是个模态瞬间，Esc 能退出来。
+
+## 11. 接手须知（这个环境里踩过的坑，别重踩）
+
+### 构建与自检
+
+```bash
+export PATH="$PATH:/c/Program Files/dotnet"          # dotnet 不在本 shell 的 PATH 上
+dotnet build QuickNote.sln -c Debug                  # 编译
+dotnet run --project src/QuickNote.SelfCheck -c Debug # 自检，当前 131 条断言
+```
+
+- 另有 `-c Release`；产物在 `bin\QuickNote\<配置>\`。
+- **程序正开着时构建会失败**（`MSB3027` 文件被锁）。先让使用者托盘退出，
+  别强杀——输入框里可能有没保存的草稿。
+
+### 别信这台机器上的像素读数
+
+- 屏幕是 **1920×1080 @125%**。DPI 不感知的探测进程拿到的窗口矩形是被
+  虚拟化过的，**要除以 1.25 才是物理值**。我曾因此误诊了一整轮。
+- `Control.DeviceDpi` **谎报 96**（实为 120）。要拿真实 DPI 用
+  `GetDpiForWindow`。
+
+### WinForms 的两条硬约束
+
+1. **交给控件属性的颜色必须完全不透明。** `Control.BackColor` 收到 alpha < 255
+   直接抛 `ArgumentException`，在构造函数里就把进程打死（连托盘图标都不出）。
+   只有纯 GDI+ 绘制的颜色才可以带 alpha。
+2. **合成按键驱动不了 WinForms 输入。** 焦点门禁挡着，直接发窗体、发子控件、
+   抢前台 + `SetFocus` 全部无效（都试过）。所以**键盘交互只能由真人验证**，
+   代码里改完必须明确告诉使用者「这条需要你按真键盘确认」。
+
+### 别用 bash heredoc 写 Windows 路径
+
+经 heredoc 传给 python/powershell 的 `\\` 会掉一层，`daliy_log\notes` 里的
+`\n` 会变成真换行、配置文件直接损坏。**用 Write 工具写字面量。**
+
+### 已经验过的事，不用再验
+
+- emoji 在 GDI+/GDI 下渲染成**彩色**（已出图确认）
+- 焦点：`AttachThreadInput` + `BringWindowToTop` + `SetForegroundWindow`
+  确实能把前台抢过来（`set=True err=0`，前台变成小条）
+- 保存落盘、中文输入法上屏、文件格式，已由使用者的真实记录验证
+- 待机内存 21.7MB（预算 35MB）、冷启动 187ms（预算 1 秒）、零第三方依赖
+
+### 仍未验证的（要提醒使用者）
+
+- **中文输入法组合态按 Enter 不误保存** —— 最关键的一条
+- 双击 Ctrl 后直接打字不碰鼠标、空框按 Tab
+- 小条的投影、圆角、着色效果、光标是否跳（都没人眼看过）
+
+### 相关文档
+
+| 文件 | 内容 |
+|---|---|
+| `2026-10-05-quicknote-design.md` | 原始 spec，**第 5 节的记录模型需按 §10.1 修订** |
+| `2026-10-05-quicknote.md` | 原始实现计划（已执行完，仅作参考） |
+| `2026-10-05-quicknote-acceptance.md` | 验收记录，第三节仍是空的 |
+| `.superpowers/sdd/2026-10-05-quicknote/progress.md` | 执行账本，含全部裁定与陷阱 |
+| 分支 `feature/quicknote` | 未合并到 master，等你验收 |
