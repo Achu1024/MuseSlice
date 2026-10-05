@@ -24,6 +24,25 @@ namespace QuickNote.SelfCheck
             CancellationStopsEarly();
             ListRecentReturnsEntriesNewestFirst();
             ListRecentHonoursLimit();
+            NewFormatEntryHasNoContext();
+        }
+
+        private static void NewFormatEntryHasNoContext()
+        {
+            using (var dir = new TempDir())
+            {
+                File.WriteAllText(Path.Combine(dir.Path, "2026-10-05.md"),
+                    "# 2026-10-05 星期一\n\n- [ ] 14:30 跟老王确认了字段\n- [x] 14:32 把 spec 写完\n\n",
+                    new UTF8Encoding(false));
+
+                var result = NoteSearcher.Search(dir.Path, "老王", 200, CancellationToken.None);
+                Check.Equal(result.Hits.Count, 1, "新格式的记录能被搜到");
+                Check.Equal(result.Hits[0].Context, "",
+                    "新格式的下一条记录不会被当成上一条的上下文");
+
+                var recent = NoteSearcher.ListRecent(dir.Path, 200, CancellationToken.None);
+                Check.Equal(recent.Hits.Count, 2, "新格式的记录会被 ListRecent 列出来");
+            }
         }
 
         private static void Write(string dir, string name, params string[] lines)

@@ -11,7 +11,7 @@ namespace QuickNote
     /// </summary>
     internal sealed class SearchResultsView : Control
     {
-        private const int RowHeight = 62;
+        private const int RowHeight = 66;
 
         private readonly Palette _p;
         private SearchResult _result = SearchResult.Empty();
@@ -123,7 +123,7 @@ namespace QuickNote
                 TextRenderer.DrawText(g, hit.Date.ToString("dddd"), _p.Chrome,
                     new Point(64, y + 6), _p.Muted);
 
-                DrawMatchLine(g, hit.Line, new Rectangle(10, y + 22, Width - 20, 20));
+                DrawHitLine(g, hit, y);
 
                 if (!string.IsNullOrEmpty(hit.Context))
                 {
@@ -132,6 +132,37 @@ namespace QuickNote
                         TextFormatFlags.EndEllipsis);
                 }
             }
+        }
+
+        /// <summary>
+        /// 匹配行：脸 + 时间戳 + 正文。脸画在行首，文件里的 "- [ ]" 不再显示——
+        /// 屏幕上看到的就是文件里那条待办的脸（定案 §10.4）。
+        /// <para>
+        /// 匹配到的行不一定是记录行（使用者写的续行也可能命中），那种行没有脸与
+        /// 时间戳可拆，原样画。
+        /// </para>
+        /// </summary>
+        private void DrawHitLine(Graphics g, SearchHit hit, int y)
+        {
+            var box = new Rectangle(10, y + 22, Width - 20, 20);
+
+            EntryInfo info;
+            if (!EntryLine.TryParse(hit.Line, out info))
+            {
+                DrawMatchLine(g, hit.Line, box);
+                return;
+            }
+
+            var faceWidth = TextRenderer.MeasureText(g, info.Face, _p.Emoji).Width;
+            TextRenderer.DrawText(g, info.Face, _p.Emoji, new Point(box.X, box.Y + 1), _p.Ink);
+
+            var at = box.X + faceWidth + 6;
+            var stampWidth = TextRenderer.MeasureText(g, info.Stamp, _p.StampFont).Width + 8;
+            TextRenderer.DrawText(g, info.Stamp, _p.StampFont, new Point(at, box.Y + 2), _p.Stamp);
+
+            var rest = new Rectangle(at + stampWidth, box.Y, box.Right - at - stampWidth, box.Height);
+            if (rest.Width <= 0) return;
+            DrawMatchLine(g, info.Content, rest);
         }
 
         /// <summary>
