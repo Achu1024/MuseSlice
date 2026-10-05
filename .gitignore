@@ -1,0 +1,9 @@
+# 日记本身不进版本库：隐私，且每天都是噪音 diff
+notes/
+
+# 编译产物
+bin/
+obj/
+
+# 头脑风暴会话产物（视觉伴侣的 mockup）
+.superpowers/
