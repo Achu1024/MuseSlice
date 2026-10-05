@@ -23,8 +23,6 @@ namespace QuickNote.SelfCheck
             Check.Equal(DateFormat.FileName(new DateTime(2026, 1, 9, 0, 0, 0)), "2026-01-09",
                 "月与日补零");
 
-            Check.Equal(DateFormat.EntryPrefix(t), "- 14:03 ", "记录行前缀格式");
-
             Check.Equal(DateFormat.ShortHeading(t), "10-05 星期一", "顶部 chrome 用的短标题不带年份");
             Check.That(DateFormat.IsEntryStart("- [ ] 14:03 新格式"), "新格式的记录行也能识别");
             Check.That(!DateFormat.IsEntryStart("- [ ] 待办"), "手打的待办列表项仍然不是记录行");

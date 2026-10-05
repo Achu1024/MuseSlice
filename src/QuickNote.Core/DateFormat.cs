@@ -30,12 +30,6 @@ namespace QuickNote.Core
             return "# " + FileName(when) + " " + when.ToString("dddd", culture);
         }
 
-        /// <summary>记录行的前缀，例如「- 14:03 」。写入与识别共用，避免两边格式漂移。</summary>
-        public static string EntryPrefix(DateTime when)
-        {
-            return "- " + Stamp(when) + " ";
-        }
-
         /// <summary>顶部 chrome 用的短标题，例如「10-05 星期一」。不带年份。</summary>
         public static string ShortHeading(DateTime when)
         {

@@ -24,7 +24,10 @@ namespace QuickNote.Core
         }
 
         /// <summary>
-        /// 追加一笔。内容全为空白时什么都不做（连文件都不创建），返回 false。
+        /// 追加一笔。<paramref name="content"/> 里的**每一行各成一条待办**（定案 §10.1）：
+        /// 使用者的真实用法是「一口气列几件要做的事」，不是写一段带结构的长文。
+        /// 每行开头若已有勾选标记（界面上画的脸，或他手打的 - [ ]），沿用它的状态。
+        /// 全部行都是空白（连标记都没有正文）时什么都不做，返回 false。
         /// </summary>
         public bool Append(string content, DateTime now)
         {
@@ -33,26 +36,25 @@ namespace QuickNote.Core
             var normalized = content.Replace("\r\n", "\n").Replace('\r', '\n');
             if (normalized.Trim().Length == 0) return false;
 
-            var text = normalized.TrimEnd('\n');
-            var lines = text.Split('\n');
+            var lines = normalized.TrimEnd('\n').Split('\n');
+
+            var entries = new StringBuilder();
+            foreach (var raw in lines)
+            {
+                bool done;
+                var body = EntryLine.StripMarker(raw, out done);
+                if (body.Length == 0) continue;      // 空行、或只有标记没有正文
+                entries.Append(EntryLine.Prefix(now, done)).Append(body).Append('\n');
+            }
+            if (entries.Length == 0) return false;   // 别创建空文件
 
             var sb = new StringBuilder();
             var path = PathFor(now);
-            var isNew = !File.Exists(path);
-
-            if (isNew)
+            if (!File.Exists(path))
             {
                 sb.Append(DateFormat.Heading(now)).Append('\n').Append('\n');
             }
-
-            // 只有首行带时间戳前缀；后续行原样写入、不缩进，
-            // 这样使用者自己写的 ## 标题与列表能正常渲染。
-            sb.Append(DateFormat.EntryPrefix(now)).Append(lines[0]).Append('\n');
-            for (var i = 1; i < lines.Length; i++)
-            {
-                sb.Append(lines[i]).Append('\n');
-            }
-            sb.Append('\n');
+            sb.Append(entries).Append('\n');
 
             try
             {
