@@ -17,6 +17,7 @@ namespace QuickNote
 
         internal const int WM_IME_STARTCOMPOSITION = 0x010D;
         internal const int WM_IME_ENDCOMPOSITION = 0x010E;
+        internal const int WM_SETFOCUS = 0x0007;
         internal const int WM_KILLFOCUS = 0x0008;
 
         /// <summary>藏掉系统画的插入符。自绘光标要用它把 RichEdit 那根 1px 黑条顶掉。</summary>

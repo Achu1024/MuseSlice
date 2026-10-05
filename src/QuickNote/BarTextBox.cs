@@ -33,9 +33,26 @@ namespace QuickNote
 
         protected override void WndProc(ref Message m)
         {
-            if (m.Msg == NativeMethods.WM_IME_STARTCOMPOSITION) _composing = true;
-            else if (m.Msg == NativeMethods.WM_IME_ENDCOMPOSITION) _composing = false;
-            else if (m.Msg == NativeMethods.WM_KILLFOCUS) _composing = false;
+            // DIAG（临时，查完输入法问题就删）：组合到底有没有开始、输入框有没有中途失焦。
+            if (m.Msg == NativeMethods.WM_IME_STARTCOMPOSITION)
+            {
+                _composing = true;
+                QuickNoteApp.Log("DIAG IME start-composition");
+            }
+            else if (m.Msg == NativeMethods.WM_IME_ENDCOMPOSITION)
+            {
+                _composing = false;
+                QuickNoteApp.Log("DIAG IME end-composition");
+            }
+            else if (m.Msg == NativeMethods.WM_KILLFOCUS)
+            {
+                _composing = false;
+                QuickNoteApp.Log("DIAG input blur");
+            }
+            else if (m.Msg == NativeMethods.WM_SETFOCUS)
+            {
+                QuickNoteApp.Log("DIAG input focus");
+            }
             // 失焦时也必须清掉组合态。若某个输入法在切换/销毁组合时没送来
             // WM_IME_ENDCOMPOSITION，这个标志会永远为真，此后每一次 Enter 都被
             // 吞掉——使用者一个字都存不进去，而且没有任何反馈。宁可偶尔误放行

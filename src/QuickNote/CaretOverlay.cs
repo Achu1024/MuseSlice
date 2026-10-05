@@ -28,7 +28,7 @@ namespace QuickNote
         private const int LogicalWidth = 2;
 
         private readonly Timer _timer;
-        private RichTextBox _box;
+        private BarTextBox _box;
         private Control _host;
         private float _scale = 1f;
         private Color _paper = Color.White;
@@ -50,7 +50,7 @@ namespace QuickNote
             };
         }
 
-        public void Attach(RichTextBox box, Control host, float scale)
+        public void Attach(BarTextBox box, Control host, float scale)
         {
             _box = box;
             _host = host;
@@ -70,6 +70,15 @@ namespace QuickNote
         {
             if (_box == null || _host == null || !_box.IsHandleCreated || !_box.Visible ||
                 !_host.Visible || !_box.Focused)
+            {
+                Stop();
+                return;
+            }
+
+            // 输入法组合期间整个让开。组合串与候选框是 IME 在画，而且 IME 要靠插入符
+            // 定位它们——我们在这里反复 HideCaret 会把 IME 的锚点抹掉。组合结束后
+            // 那次上屏会再触发一次文本变更，Follow 自然恢复。
+            if (_box.IsComposing)
             {
                 Stop();
                 return;
