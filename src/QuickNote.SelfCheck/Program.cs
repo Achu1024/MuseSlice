@@ -13,6 +13,7 @@ namespace QuickNote.SelfCheck
                 DateFormatChecks.Run();
                 NoteStoreChecks.Run();
                 AppConfigChecks.Run();
+                InputRulesChecks.Run();
                 // 后续任务在此处依次追加
             }
             catch (Exception ex)
