@@ -27,6 +27,7 @@ namespace QuickNote
         private readonly BarChrome _chrome;
 
         private readonly Panel _content;          // 两种模式互斥的内容区
+        private readonly CaretOverlay _caret;    // 自绘光标，浮在输入框之上
         private readonly BarTextBox _input;
         private readonly SearchResultsView _results;
         private readonly Panel _searchRow;
@@ -82,6 +83,10 @@ namespace QuickNote
             _content.Controls.Add(_input);     // Fill 先加
             _content.Controls.Add(_results);   // 与 _input 互斥，同一时间只有一个可见
 
+            _caret = new CaretOverlay { Parent = _content };
+            _caret.BringToFront();             // Add 会把新控件放到 z 序最后，也就是最底下
+            _caret.SetColors(palette);
+
             // 停靠顺序由 z-order 决定：WinForms 从末尾往前停靠，先加的 Fill 最后停靠。
             // 所以 Fill 必须最先加，上下各条才能在它之外拿到自己的空间。
             Controls.Add(_content);
@@ -107,7 +112,12 @@ namespace QuickNote
             {
                 MarkdownHighlighter.Apply(box, _palette);
                 FitToContent();
+                _caret.Follow();
             };
+
+            // 光标只在有焦点时存在：失焦立刻停表，待机没有任何计时器在跑。
+            box.GotFocus += delegate { _caret.Attach(box, _content, _scale); };
+            box.LostFocus += delegate { _caret.Stop(); };
             return box;
         }
 
@@ -242,6 +252,7 @@ namespace QuickNote
             }
             catch { /* 老系统上没有这个 API，保持 1.0 */ }
             ApplySize();
+            _caret.Attach(_input, _content, _scale);
 
             try
             {
@@ -478,6 +489,7 @@ namespace QuickNote
             _chrome.Bottom.ForeColor = palette.Muted;
             _searchStatus.ForeColor = palette.Muted;
             _chrome.ApplyHairline(palette.Hairline);
+            _caret.SetColors(palette);
             MarkdownHighlighter.Apply(_input, palette);
             Invalidate(true);
         }
@@ -513,6 +525,7 @@ namespace QuickNote
             _lastResult = SearchResult.Empty();
             _queryBox.Text = "";
             _results.SetResult(_lastResult, "");
+            _caret.Stop();
             if (_mode == BarMode.Search) SwitchTo(BarMode.Record);
             HideBar();
         }
@@ -544,6 +557,7 @@ namespace QuickNote
             {
                 _input.Focus();
                 _input.SelectionStart = _input.TextLength;
+                _caret.Follow();
             }
         }
 

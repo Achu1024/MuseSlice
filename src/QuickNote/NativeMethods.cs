@@ -19,6 +19,10 @@ namespace QuickNote
         internal const int WM_IME_ENDCOMPOSITION = 0x010E;
         internal const int WM_KILLFOCUS = 0x0008;
 
+        /// <summary>藏掉系统画的插入符。自绘光标要用它把 RichEdit 那根 1px 黑条顶掉。</summary>
+        [DllImport("user32.dll")]
+        internal static extern bool HideCaret(IntPtr hWnd);
+
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         internal static extern uint RegisterWindowMessage(string lpString);
 
