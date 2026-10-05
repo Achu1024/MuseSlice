@@ -31,6 +31,20 @@ namespace QuickNote.Core
             AutoStart = true;
         }
 
+        /// <summary>
+        /// 校验日记目录。返回错误说明，通过则返回 null。
+        /// <para>
+        /// 只拦「空」这一类：目录不存在不算错，因为写入时会创建它，
+        /// 而且网络盘可能稍后才挂上。空路径则会让 NoteStore 构造直接抛异常，
+        /// 异常逃到全局处理器只写日志，使用者看到的是「点了确定什么都没发生」。
+        /// </para>
+        /// </summary>
+        public static string ValidateNotesDir(string dir)
+        {
+            if (string.IsNullOrWhiteSpace(dir)) return "日记目录不能为空";
+            return null;
+        }
+
         public static string AppDataDir()
         {
             return Path.Combine(

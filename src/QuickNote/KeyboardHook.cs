@@ -17,7 +17,8 @@ namespace QuickNote
     internal sealed class KeyboardHook : IDisposable
     {
         private readonly DoubleTapDetector _detector;
-        private readonly Action _onActivated;
+        private readonly IntPtr _targetWindow;
+        private readonly uint _showMessage;
         private readonly NativeMethods.LowLevelKeyboardProc _proc;   // 必须持有引用，否则会被 GC 回收
         private IntPtr _hookId = IntPtr.Zero;
 
@@ -26,10 +27,21 @@ namespace QuickNote
         private long _maxTicks;
 #endif
 
-        public KeyboardHook(int thresholdMs, Action onActivated)
+        /// <summary>
+        /// 触发时只向 <paramref name="targetWindow"/> 投递 <paramref name="showMessage"/>，
+        /// 绝不在回调里直接做事。
+        /// <para>
+        /// 这里曾经直接调用一个 Action，而那个 Action 一路做到「读当天文件算条数 →
+        /// 全文着色 → 创建窗口 → 抢前台」。低级钩子的回调是在安装它的 UI 线程上执行的，
+        /// 期间 Windows 会阻塞整条键盘输入链路——正是 spec 第 8 节要防的那件事。
+        /// 投递消息则立刻返回，真正的活在消息循环里做。
+        /// </para>
+        /// </summary>
+        public KeyboardHook(int thresholdMs, IntPtr targetWindow, uint showMessage)
         {
             _detector = new DoubleTapDetector(thresholdMs);
-            _onActivated = onActivated;
+            _targetWindow = targetWindow;
+            _showMessage = showMessage;
             _proc = HookProc;
         }
 
@@ -79,7 +91,10 @@ namespace QuickNote
                 action = KeyAction.OtherKey;
             }
 
-            if (_detector.KeyEvent(action, DateTime.Now)) _onActivated();
+            if (_detector.KeyEvent(action, DateTime.Now))
+            {
+                NativeMethods.PostMessage(_targetWindow, _showMessage, IntPtr.Zero, IntPtr.Zero);
+            }
         }
 
 #if DEBUG

@@ -35,6 +35,11 @@ namespace QuickNote
         {
             if (m.Msg == NativeMethods.WM_IME_STARTCOMPOSITION) _composing = true;
             else if (m.Msg == NativeMethods.WM_IME_ENDCOMPOSITION) _composing = false;
+            else if (m.Msg == NativeMethods.WM_KILLFOCUS) _composing = false;
+            // 失焦时也必须清掉组合态。若某个输入法在切换/销毁组合时没送来
+            // WM_IME_ENDCOMPOSITION，这个标志会永远为真，此后每一次 Enter 都被
+            // 吞掉——使用者一个字都存不进去，而且没有任何反馈。宁可偶尔误放行
+            // 一次 Enter，也不能让保存功能永久失效。
             base.WndProc(ref m);
         }
 

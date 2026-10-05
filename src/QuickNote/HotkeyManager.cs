@@ -13,6 +13,8 @@ namespace QuickNote
         private KeyboardHook _hook;
         private FallbackHotkey _fallback;
         private Action _onActivated;
+        private IntPtr _targetWindow;
+        private uint _showMessage;
 
         /// <summary>钩子装不上、已降级到备用组合键时触发，参数是给使用者看的原因。</summary>
         public event Action<string> Degraded;
@@ -22,13 +24,19 @@ namespace QuickNote
             _config = config;
         }
 
-        public void Start(Action onActivated)
+        /// <summary>
+        /// <paramref name="targetWindow"/> 与 <paramref name="showMessage"/> 用于主路径：
+        /// 钩子回调只投递这条消息，具体工作回到消息循环里做。
+        /// </summary>
+        public void Start(Action onActivated, IntPtr targetWindow, uint showMessage)
         {
             _onActivated = onActivated;
+            _targetWindow = targetWindow;
+            _showMessage = showMessage;
 
             if (_config.HotkeyMode == AppConfig.ModeDoubleTap)
             {
-                _hook = new KeyboardHook(_config.DoubleTapMs, onActivated);
+                _hook = new KeyboardHook(_config.DoubleTapMs, targetWindow, showMessage);
                 if (_hook.TryInstall()) return;
 
                 _hook.Dispose();
@@ -58,7 +66,7 @@ namespace QuickNote
         public void ApplyConfigChange()
         {
             Dispose();
-            Start(_onActivated);
+            Start(_onActivated, _targetWindow, _showMessage);
         }
 
         public void Dispose()

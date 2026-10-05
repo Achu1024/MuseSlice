@@ -39,11 +39,16 @@ namespace QuickNote
             {
                 _tray.Balloon("QuickNote 热键降级", reason);
             };
-            _hotkeys.Start(ShowBar);
+            _hotkeys.Start(ShowBar, _messageWindow.Handle, showMessage);
 
             // 自启：注册表里存的是绝对路径，程序挪过位置就静默失效，每次启动自查一遍
             AutoStart.EnsurePathCurrent();
             if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
+
+            // spec 第 11 节：笔记目录不存在时启动就建好。否则托盘里的
+            // 「打开今天的日记」会因目录缺失抛异常，而使用者看不到任何反馈。
+            try { Directory.CreateDirectory(_config.NotesDir); }
+            catch (Exception ex) { Log("创建笔记目录失败：" + ex.Message); }
         }
 
         private void ShowBar()
@@ -54,15 +59,32 @@ namespace QuickNote
 
         private void OpenToday()
         {
-            var path = Path.Combine(_config.NotesDir, DateFormat.FileName(DateTime.Now) + ".md");
-            if (!File.Exists(path)) File.WriteAllText(path, "", new System.Text.UTF8Encoding(false));
-            Open(path);
+            try
+            {
+                Directory.CreateDirectory(_config.NotesDir);
+                var path = Path.Combine(_config.NotesDir, DateFormat.FileName(DateTime.Now) + ".md");
+                if (!File.Exists(path)) File.WriteAllText(path, "", new System.Text.UTF8Encoding(false));
+                Open(path);
+            }
+            catch (Exception ex)
+            {
+                Log("打开今天的日记失败：" + ex);
+                _tray.Balloon("QuickNote", "打不开今天的日记：" + ex.Message);
+            }
         }
 
         private void OpenNotesFolder()
         {
-            Directory.CreateDirectory(_config.NotesDir);
-            Open(_config.NotesDir);
+            try
+            {
+                Directory.CreateDirectory(_config.NotesDir);
+                Open(_config.NotesDir);
+            }
+            catch (Exception ex)
+            {
+                Log("打开日记目录失败：" + ex);
+                _tray.Balloon("QuickNote", "打不开日记目录：" + ex.Message);
+            }
         }
 
         private static void Open(string path)
@@ -78,13 +100,23 @@ namespace QuickNote
                 if (dlg.ShowDialog() != DialogResult.OK) return;
             }
 
-            _store = new NoteStore(_config.NotesDir);
-            _bar.SetStore(_store);
-            _hotkeys.ApplyConfigChange();
-            _bar.ApplyTheme(Theme.Current(_config.Theme));
-            if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
-            _tray.SetAutoStartChecked(_config.AutoStart);
-            _tray.Balloon("QuickNote", "设置已保存");
+            try
+            {
+                _store = new NoteStore(_config.NotesDir);
+                _bar.SetStore(_store);
+                _hotkeys.ApplyConfigChange();
+                _bar.ApplyTheme(Theme.Current(_config.Theme));
+                if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
+                _tray.SetAutoStartChecked(_config.AutoStart);
+                _tray.Balloon("QuickNote", "设置已保存");
+            }
+            catch (Exception ex)
+            {
+                // 托盘点击处理器里逃出去的异常只会被全局处理器写进日志，
+                // 使用者什么都看不到。这里必须自己说出来。
+                Log("应用设置失败：" + ex);
+                _tray.Balloon("QuickNote 设置未能生效", ex.Message);
+            }
         }
 
         private void ToggleAutoStart()

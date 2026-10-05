@@ -16,6 +16,7 @@ namespace QuickNote
         private readonly Palette _p;
         private SearchResult _result = SearchResult.Empty();
         private int _selected;
+        private int _firstVisible;
         private string _query = "";
 
         public event Action<SearchHit> Activated;
@@ -43,7 +44,17 @@ namespace QuickNote
             _result = result ?? SearchResult.Empty();
             _query = query ?? "";
             _selected = 0;
+            _firstVisible = 0;
             Invalidate();
+        }
+
+        private int VisibleRows
+        {
+            get
+            {
+                var rows = Height / RowHeight;
+                return rows < 1 ? 1 : rows;
+            }
         }
 
         public void MoveSelection(int delta)
@@ -52,7 +63,18 @@ namespace QuickNote
             _selected += delta;
             if (_selected < 0) _selected = 0;
             if (_selected >= _result.Hits.Count) _selected = _result.Hits.Count - 1;
+            ScrollToSelection();
             Invalidate();
+        }
+
+        /// <summary>
+        /// 让选中项始终留在可视范围内。不做这件事的话，结果多于可视行数时
+        /// ↑↓ 会把高亮走到屏幕外，然后回车打开一条使用者根本看不见的记录。
+        /// </summary>
+        private void ScrollToSelection()
+        {
+            _firstVisible = SearchScroll.FirstVisible(
+                _selected, VisibleRows, _result.Hits.Count, _firstVisible);
         }
 
         public void ActivateSelected()
@@ -73,10 +95,10 @@ namespace QuickNote
                 return;
             }
 
-            var lastVisible = Math.Min(_result.Hits.Count, Height / RowHeight);
-            for (var i = 0; i < lastVisible; i++)
+            var lastVisible = Math.Min(_result.Hits.Count, _firstVisible + VisibleRows);
+            for (var i = _firstVisible; i < lastVisible; i++)
             {
-                var y = i * RowHeight;
+                var y = (i - _firstVisible) * RowHeight;
                 if (i == _selected)
                 {
                     using (var b = new SolidBrush(_p.Selection))
@@ -151,10 +173,11 @@ namespace QuickNote
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            var index = e.Y / RowHeight;
+            var index = _firstVisible + e.Y / RowHeight;
             if (index >= 0 && index < _result.Hits.Count)
             {
                 _selected = index;
+                ScrollToSelection();
                 Invalidate();
                 ActivateSelected();
             }

@@ -17,6 +17,7 @@ namespace QuickNote.SelfCheck
                 DoubleTapDetectorChecks.Run();
                 NoteSearcherChecks.Run();
                 BarGeometryChecks.Run();
+                ReviewFixChecks.Run();
                 // 后续任务在此处依次追加
             }
             catch (Exception ex)

@@ -154,6 +154,17 @@ namespace QuickNote
 
         private void Apply()
         {
+            // 空目录会让 NoteStore 构造抛异常，而异常逃到全局处理器只写日志——
+            // 使用者看到的是「点了确定，什么都没发生」。宁可不关对话框也要说明白。
+            var problem = AppConfig.ValidateNotesDir(_notesDir.Text);
+            if (problem != null)
+            {
+                MessageBox.Show(this, problem + "。", "QuickNote",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                DialogResult = DialogResult.None;   // 阻止关闭
+                return;
+            }
+
             _config.HotkeyMode = _doubleTap.Checked ? AppConfig.ModeDoubleTap : AppConfig.ModeCombo;
             _config.DoubleTapMs = (int)_threshold.Value;
             if (_fallback.Text.IndexOf('+') > 0) _config.FallbackHotkey = _fallback.Text;

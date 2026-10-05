@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using QuickNote.Core;
 
 namespace QuickNote
 {
@@ -27,6 +28,12 @@ namespace QuickNote
         {
             if (box == null || box.IsDisposed || !box.IsHandleCreated) return;
             if (box.TextLength == 0) return;
+
+            // 粘贴一大段文本会打破「内容只有几百字节」这个设计前提。
+            // 那时每次按键重扫全文着色会冻住 UI 线程，而 UI 线程一冻就卡住
+            // 全局键盘钩子。超过阈值就干脆不着色——纯文本仍然可读，
+            // 而打字不会被冻住。
+            if (!BarGeometry.ShouldHighlight(box.TextLength)) return;
 
             var selStart = box.SelectionStart;
             var selLength = box.SelectionLength;

@@ -177,7 +177,13 @@ namespace QuickNote
             if (_mode != BarMode.Record) return;
             // 走 SetLineCount 而不是直接改 Height：尺寸常量是 96 DPI 的逻辑值，
             // 乘缩放系数的事由 ApplySize 统一负责，绕过它就会在高 DPI 下偏小。
-            SetLineCount(_input.Lines.Length);
+            //
+            // 行数用 GetLineFromCharIndex 算，不用 .Lines——后者在粘贴大段文本时
+            // 会为每一行分配一个字符串，正是最不该在此时刻分配。
+            var lineCount = _input.TextLength == 0
+                ? 1
+                : _input.GetLineFromCharIndex(_input.TextLength) + 1;
+            SetLineCount(lineCount);
         }
 
         protected override CreateParams CreateParams
