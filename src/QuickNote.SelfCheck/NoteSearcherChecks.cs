@@ -22,6 +22,8 @@ namespace QuickNote.SelfCheck
             IgnoresNonMarkdownAndSubdirectories();
             UnreadableFileIsSkipped();
             CancellationStopsEarly();
+            ListRecentReturnsEntriesNewestFirst();
+            ListRecentHonoursLimit();
         }
 
         private static void Write(string dir, string name, params string[] lines)
@@ -202,6 +204,58 @@ namespace QuickNote.SelfCheck
                 catch (OperationCanceledException) { threw = true; }
 
                 Check.That(threw, "已取消的令牌立刻抛出 OperationCanceledException");
+            }
+        }
+
+        /// <summary>
+        /// 搜索框为空时列出全部记录。注意「记录」指的是程序生成的记录行
+        /// （时间戳前缀），不是文件里的每一行——标题行和续行都不算。
+        /// </summary>
+        private static void ListRecentReturnsEntriesNewestFirst()
+        {
+            using (var dir = new TempDir())
+            {
+                Write(dir.Path, "2026-09-01.md",
+                    "# 2026-09-01 星期二",
+                    "",
+                    "- 09:00 第一条",
+                    "这条是续行，不算独立记录",
+                    "",
+                    "- 14:32 第二条");
+
+                Write(dir.Path, "2026-10-05.md",
+                    "# 2026-10-05 星期一",
+                    "",
+                    "- 08:15 最新的一条");
+
+                var r = NoteSearcher.ListRecent(dir.Path, NoteSearcher.DefaultLimit, CancellationToken.None);
+
+                Check.Equal(r.Hits.Count, 3, "只数列记录行：标题行与续行都不算");
+                Check.Equal(r.Hits[0].Line, "- 08:15 最新的一条", "最近的在最前");
+                Check.Equal(r.Hits[1].Line, "- 14:32 第二条", "同一天内按文件内顺序");
+                Check.Equal(r.Hits[2].Line, "- 09:00 第一条", "最旧的在最后");
+                Check.Equal(r.Hits[2].Context, "这条是续行，不算独立记录",
+                    "多行记录的续行作为上下文带出来");
+                Check.Equal(r.ScannedFiles, 2, "两个文件都扫了");
+
+                var none = NoteSearcher.ListRecent(Path.Combine(dir.Path, "不存在"),
+                    NoteSearcher.DefaultLimit, CancellationToken.None);
+                Check.Equal(none.Hits.Count, 0, "目录不存在时返回空而不是抛异常");
+            }
+        }
+
+        private static void ListRecentHonoursLimit()
+        {
+            using (var dir = new TempDir())
+            {
+                var lines = new List<string>();
+                for (var i = 1; i <= 20; i++) lines.Add("- 14:30 第 " + i + " 条");
+                Write(dir.Path, "2026-10-05.md", lines.ToArray());
+
+                var r = NoteSearcher.ListRecent(dir.Path, 5, CancellationToken.None);
+
+                Check.Equal(r.Hits.Count, 5, "最多返回 limit 条");
+                Check.That(r.Truncated, "被截断时标记出来，免得使用者以为只有这些");
             }
         }
     }

@@ -27,19 +27,7 @@ namespace QuickNote.Core
             if (!Directory.Exists(notesDir)) return result;
 
             var needle = query.Trim();
-            var files = new List<KeyValuePair<DateTime, string>>();
-
-            foreach (var path in Directory.GetFiles(notesDir, "*.md"))
-            {
-                DateTime date;
-                if (TryParseDate(Path.GetFileNameWithoutExtension(path), out date))
-                {
-                    files.Add(new KeyValuePair<DateTime, string>(date, path));
-                }
-            }
-
-            // 按日期倒序，最近的在最前
-            files.Sort((a, b) => b.Key.CompareTo(a.Key));
+            var files = GatherFiles(notesDir);
 
             foreach (var entry in files)
             {
@@ -80,6 +68,75 @@ namespace QuickNote.Core
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 列出最近的记录，不筛内容。搜索框为空时用它——使用者按 Tab 进搜索
+        /// 多半是想先看看最近记了什么，而不是盯着一片空白。
+        /// <para>
+        /// 「记录」指程序生成的记录行（时间戳前缀）：标题行、正文续行都不算。
+        /// 同一文件内**倒序**遍历，因为一天里最后写的那条才是最近的。
+        /// </para>
+        /// </summary>
+        public static SearchResult ListRecent(string notesDir, int limit, CancellationToken ct)
+        {
+            var result = new SearchResult();
+            if (limit <= 0 || !Directory.Exists(notesDir)) return result;
+
+            foreach (var entry in GatherFiles(notesDir))
+            {
+                ct.ThrowIfCancellationRequested();
+                result.ScannedFiles++;
+
+                List<string> lines;
+                try
+                {
+                    lines = ReadAllLines(entry.Value);
+                }
+                catch (Exception)
+                {
+                    result.UnreadableFiles++;
+                    continue;
+                }
+
+                for (var i = lines.Count - 1; i >= 0; i--)
+                {
+                    if (!DateFormat.IsEntryStart(lines[i])) continue;
+
+                    if (result.Hits.Count >= limit)
+                    {
+                        result.Truncated = true;
+                        return result;
+                    }
+
+                    result.Hits.Add(new SearchHit
+                    {
+                        FilePath = entry.Value,
+                        Date = entry.Key,
+                        LineNumber = i + 1,
+                        Line = lines[i],
+                        Context = ContextFor(lines, i)
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>顶层 *.md，按日期倒序。名字不合规的文件直接忽略。</summary>
+        private static List<KeyValuePair<DateTime, string>> GatherFiles(string notesDir)
+        {
+            var files = new List<KeyValuePair<DateTime, string>>();
+            foreach (var path in Directory.GetFiles(notesDir, "*.md"))
+            {
+                DateTime date;
+                if (TryParseDate(Path.GetFileNameWithoutExtension(path), out date))
+                {
+                    files.Add(new KeyValuePair<DateTime, string>(date, path));
+                }
+            }
+            files.Sort((a, b) => b.Key.CompareTo(a.Key));
+            return files;
         }
 
         /// <summary>

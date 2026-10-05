@@ -232,36 +232,47 @@ namespace QuickNote
 
         // ---- 记录模式的键位 ----
 
-        protected override void OnKeyDown(KeyEventArgs e)
+        /// <summary>
+        /// 记录模式的按键处理。
+        /// <para>
+        /// 必须挂在 <see cref="ProcessCmdKey"/> 而不是 OnKeyDown：Tab 在 WinForms 里
+        /// 是「对话框键」，会在 ProcessDialogKey 阶段被当作「移到下一个控件」消费掉，
+        /// 靠 KeyPreview + OnKeyDown 拦不住——实测按 Tab 毫无反应。
+        /// ProcessCmdKey 是 WinForms 专门留给 Tab / 方向键这类键的拦截点，
+        /// 在对话框键处理之前到达。
+        /// </para>
+        /// </summary>
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            base.OnKeyDown(e);
-            if (_mode != BarMode.Record) return;
+            if (_mode != BarMode.Record) return base.ProcessCmdKey(ref msg, keyData);
 
-            if (e.KeyCode == Keys.Enter)
+            var key = keyData & Keys.KeyCode;
+            var shift = (keyData & Keys.Shift) == Keys.Shift;
+
+            if (key == Keys.Enter)
             {
-                var action = InputRules.DecideEnter(_input.IsComposing, e.Shift);
-                if (action == EnterAction.Ignore) { e.SuppressKeyPress = true; return; }
-                if (action == EnterAction.Newline) return;      // 交给控件插入换行
-                e.SuppressKeyPress = true;
+                var action = InputRules.DecideEnter(_input.IsComposing, shift);
+                if (action == EnterAction.Ignore) return true;   // 组合态：交给输入法
+                if (action == EnterAction.Newline) return false; // 交给控件插入换行
                 Save();
-                return;
+                return true;
             }
 
-            if (e.KeyCode == Keys.Escape)
+            if (key == Keys.Escape)
             {
-                e.SuppressKeyPress = true;
                 CloseBar();     // 隐藏但不清空：写过三行东西误按一下全没了最劝退
-                return;
+                return true;
             }
 
-            if (e.KeyCode == Keys.Tab)
+            if (key == Keys.Tab)
             {
                 var tab = InputRules.DecideTab(BarMode.Record, _input.TextLength == 0);
-                e.SuppressKeyPress = true;
                 if (tab == TabAction.Indent) InsertIndent();
                 else if (tab == TabAction.SwitchToSearch) SwitchTo(BarMode.Search);
-                return;
+                return true;
             }
+
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void InsertIndent()
@@ -387,9 +398,13 @@ namespace QuickNote
                 Reposition();
                 _queryBox.Text = _lastQuery;          // 沿用上次查询词，避免反复输入
                 _queryBox.SelectionStart = _queryBox.TextLength;
-                _results.SetResult(_lastResult, _lastQuery);
                 RefreshChrome();
                 _queryBox.Focus();
+
+                // 显式发起一次扫描。不能只靠 _queryBox.Text 的 TextChanged：
+                // 首次进入时文本本来就从 "" 到 ""，不产生变更事件，结果是一片空白。
+                // 空查询会走 ListRecent，把最近的记录直接列出来。
+                _search.Query(_queryBox.Text);
             }
             else
             {

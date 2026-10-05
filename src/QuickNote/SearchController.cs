@@ -41,28 +41,25 @@ namespace QuickNote
         {
             Cancel();
 
-            if (string.IsNullOrEmpty(text) || text.Trim().Length == 0)
-            {
-                _onResult(SearchResult.Empty());
-                return;
-            }
-
+            var query = (text ?? "").Trim();
             var cts = new CancellationTokenSource();
             _cts = cts;
             _onStarted();
 
-            var query = text.Trim();
             var dir = _notesDir;
             var limit = NoteSearcher.DefaultLimit;
-            var debounce = _debounceMs;
+            // 空查询是「列最近记录」，不筛任何东西，没什么可防抖的——直接扫。
+            var debounce = query.Length == 0 ? 0 : _debounceMs;
 
             Task.Run(async delegate
             {
                 try
                 {
-                    await Task.Delay(debounce, cts.Token).ConfigureAwait(false);
+                    if (debounce > 0) await Task.Delay(debounce, cts.Token).ConfigureAwait(false);
 
-                    var result = NoteSearcher.Search(dir, query, limit, cts.Token);
+                    var result = query.Length == 0
+                        ? NoteSearcher.ListRecent(dir, limit, cts.Token)
+                        : NoteSearcher.Search(dir, query, limit, cts.Token);
                     if (cts.IsCancellationRequested) return;
 
                     if (_ui.IsHandleCreated && !_ui.IsDisposed)
