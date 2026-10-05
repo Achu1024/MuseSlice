@@ -7,23 +7,24 @@ namespace QuickNote
 {
     /// <summary>
     /// 悬浮小条。无边框、置顶、不进任务栏、带投影与圆角。
-    /// 本任务只做外壳与定位；语法高亮与业务在后续任务接入。
     /// </summary>
     internal sealed class CaptureBar : Form
     {
-        /// <summary>设计基准宽度（96 DPI 下的逻辑像素）。</summary>
+        /// <summary>设计基准尺寸（96 DPI 下的逻辑像素）。</summary>
         private const int LogicalWidth = 560;
         private const int LogicalLineHeight = 22;
         private const int LogicalChrome = 90;
 
         private readonly Palette _palette;
+        private readonly BarTextBox _input;
 
         /// <summary>
         /// 显示器 DPI / 96。尺寸常量都按 96 DPI 写，实际用之前乘上它。
         /// <para>
-        /// 不靠 WinForms 的 AutoScaleMode 做这件事：对纯代码构造的窗体，
-        /// 它会自己把 AutoScaleDimensions 归一到当前系统 DPI，得到一个恒为 1
-        /// 的缩放系数，等于什么也不做，还平添一层难以推理的行为。
+        /// 不靠 WinForms 的 AutoScaleMode：对纯代码构造的窗体，它会自己把
+        /// AutoScaleDimensions 归一到当前系统 DPI，得到恒为 1 的系数，等于什么
+        /// 也不做。而 Control.DeviceDpi 在本机谎报 96（显示器实为 125%），
+        /// 所以用 GetDpiForWindow。
         /// </para>
         /// </summary>
         private float _scale = 1f;
@@ -45,6 +46,20 @@ namespace QuickNote
             AutoScaleMode = AutoScaleMode.None;   // 缩放由 _scale 显式负责
             Padding = new Padding(14, 10, 14, 10);
 
+            _input = new BarTextBox
+            {
+                Dock = DockStyle.Fill,
+                BackColor = palette.BarBack,
+                ForeColor = palette.Text,
+                Font = palette.Body
+            };
+            _input.TextChangedByUser += delegate
+            {
+                MarkdownHighlighter.Apply(_input, _palette);
+                FitToContent();
+            };
+            Controls.Add(_input);
+
             ApplySize();
         }
 
@@ -55,11 +70,18 @@ namespace QuickNote
                 BarGeometry.HeightFor(_lineCount, LogicalLineHeight, LogicalChrome) * _scale);
         }
 
-        /// <summary>按内容行数调整高度（Task 9 起由输入框内容驱动）。</summary>
+        /// <summary>按内容行数调整高度。</summary>
         public void SetLineCount(int lineCount)
         {
             _lineCount = lineCount;
             ApplySize();
+        }
+
+        private void FitToContent()
+        {
+            // 走 SetLineCount 而不是直接改 Height：尺寸常量是 96 DPI 的逻辑值，
+            // 乘缩放系数的事由 ApplySize 统一负责，绕过它就会在高 DPI 下偏小。
+            SetLineCount(_input.Lines.Length);
         }
 
         protected override CreateParams CreateParams
@@ -78,11 +100,6 @@ namespace QuickNote
 
             // 句柄到手后显示器 DPI 才可查。尺寸常量乘上它，高 DPI 下才能保持
             // 和设计稿一致的观感（否则框不放大、字却按 DPI 放大了，显得局促）。
-            //
-            // 用 GetDpiForWindow 而不是 Control.DeviceDpi：本机实测后者恒返回 96，
-            // 而同一个进程看到的 workArea 是 1920×1080（DPI 不感知的进程只能看到
-            // 虚拟化的 1536×864），两者不自洽，说明 DeviceDpi 在这个
-            // .NET Framework + PerMonitorV2 组合下不可信。
             try
             {
                 var dpi = NativeMethods.GetDpiForWindow(Handle);
