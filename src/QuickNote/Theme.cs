@@ -55,13 +55,17 @@ namespace QuickNote
         {
             return new Palette
             {
-                BarBack = Color.FromArgb(242, 28, 28, 32),
-                Border = Color.FromArgb(38, 255, 255, 255),
+                // 注意：交给控件（BackColor / ForeColor / SelectionColor）的颜色必须是
+                // 完全不透明的。WinForms 控件的 BackColor 收到 alpha < 255 会直接抛
+                // ArgumentException「控件不支持透明的背景色」，在构造函数里就把程序打死。
+                // 只有纯 GDI+ 绘制的颜色（Border、Selection）才允许带 alpha。
+                BarBack = Color.FromArgb(28, 28, 32),
+                Border = Color.FromArgb(38, 255, 255, 255),   // 仅用于绘制
                 Text = Color.FromArgb(232, 232, 234),
-                Muted = Color.FromArgb(120, 255, 255, 255),
+                Muted = Color.FromArgb(135, 135, 138),
                 Accent = Color.FromArgb(124, 176, 255),
                 Todo = Color.FromArgb(240, 180, 94),
-                Selection = Color.FromArgb(60, 110, 168, 254),
+                Selection = Color.FromArgb(60, 110, 168, 254),  // 仅用于绘制
                 Error = Color.FromArgb(255, 120, 120),
                 Body = new Font("Microsoft YaHei UI", 10.5f),
                 HeadingFont = new Font("Microsoft YaHei UI", 10.5f, FontStyle.Bold),
@@ -74,13 +78,13 @@ namespace QuickNote
         {
             return new Palette
             {
-                BarBack = Color.FromArgb(246, 250, 250, 252),
-                Border = Color.FromArgb(30, 0, 0, 0),
+                BarBack = Color.FromArgb(250, 250, 252),
+                Border = Color.FromArgb(30, 0, 0, 0),         // 仅用于绘制
                 Text = Color.FromArgb(28, 28, 32),
-                Muted = Color.FromArgb(130, 0, 0, 0),
+                Muted = Color.FromArgb(122, 122, 126),
                 Accent = Color.FromArgb(28, 96, 200),
                 Todo = Color.FromArgb(176, 106, 16),
-                Selection = Color.FromArgb(50, 60, 130, 230),
+                Selection = Color.FromArgb(50, 60, 130, 230),   // 仅用于绘制
                 Error = Color.FromArgb(190, 40, 40),
                 Body = new Font("Microsoft YaHei UI", 10.5f),
                 HeadingFont = new Font("Microsoft YaHei UI", 10.5f, FontStyle.Bold),

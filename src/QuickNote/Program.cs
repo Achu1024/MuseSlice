@@ -11,6 +11,7 @@ namespace QuickNote
         private readonly AppConfig _config;
         private readonly TrayIcon _tray;
         private readonly MessageWindow _messageWindow;
+        private CaptureBar _bar;
 
         public QuickNoteApp()
         {
@@ -25,9 +26,15 @@ namespace QuickNote
             _tray.OpenTodayRequested += OpenToday;
             _tray.OpenNotesFolderRequested += OpenNotesFolder;
             _tray.ExitRequested += ExitApp;
+
+            _bar = new CaptureBar(Theme.Current(_config.Theme));
         }
 
-        private void ShowBar() { /* Task 8 起接入实际小条 */ }
+        private void ShowBar()
+        {
+            if (_bar == null) return;
+            _bar.ShowBar();
+        }
 
         private void OpenToday()
         {

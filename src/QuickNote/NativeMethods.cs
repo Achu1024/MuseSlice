@@ -31,5 +31,18 @@ namespace QuickNote
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        // ---- 窗口外观（Task 8）----
+
+        internal const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+        internal const int DWMWCP_ROUND = 2;
+        internal const int CS_DROPSHADOW = 0x00020000;
+
+        [DllImport("dwmapi.dll")]
+        internal static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        /// <summary>窗口所在显示器的实际 DPI。比 Control.DeviceDpi 可靠。</summary>
+        [DllImport("user32.dll")]
+        internal static extern uint GetDpiForWindow(IntPtr hwnd);
     }
 }

@@ -1967,10 +1967,10 @@ namespace QuickNote
         {
             return new Palette
             {
-                BarBack = Color.FromArgb(242, 28, 28, 32),
+                BarBack = Color.FromArgb(28, 28, 32),
                 Border = Color.FromArgb(38, 255, 255, 255),
                 Text = Color.FromArgb(232, 232, 234),
-                Muted = Color.FromArgb(120, 255, 255, 255),
+                Muted = Color.FromArgb(135, 135, 138),
                 Accent = Color.FromArgb(124, 176, 255),
                 Todo = Color.FromArgb(240, 180, 94),
                 Selection = Color.FromArgb(60, 110, 168, 254),
@@ -1986,10 +1986,10 @@ namespace QuickNote
         {
             return new Palette
             {
-                BarBack = Color.FromArgb(246, 250, 250, 252),
+                BarBack = Color.FromArgb(250, 250, 252),
                 Border = Color.FromArgb(30, 0, 0, 0),
                 Text = Color.FromArgb(28, 28, 32),
-                Muted = Color.FromArgb(130, 0, 0, 0),
+                Muted = Color.FromArgb(122, 122, 126),
                 Accent = Color.FromArgb(28, 96, 200),
                 Todo = Color.FromArgb(176, 106, 16),
                 Selection = Color.FromArgb(50, 60, 130, 230),
@@ -2442,7 +2442,7 @@ namespace QuickNote
             ShowInTaskbar = false;
             TopMost = true;
             StartPosition = FormStartPosition.Manual;
-            BackColor = palette.BarBack.Color;
+            BackColor = palette.BarBack;
             KeyPreview = true;
             DoubleBuffered = true;
 
@@ -2750,7 +2750,7 @@ namespace QuickNote
         _input = new BarTextBox
         {
             Dock = DockStyle.Fill,
-            BackColor = palette.BarBack.Color,
+            BackColor = palette.BarBack,
             ForeColor = palette.Text,
             Font = palette.Body,
             AcceptsReturn = true
@@ -2764,8 +2764,9 @@ namespace QuickNote
 ```csharp
         private void FitToContent()
         {
-            var lineCount = _input.Lines.Length;
-            Height = BarGeometry.HeightFor(lineCount, 22, 90);
+            // 走 SetLineCount 而不是直接改 Height：尺寸常量是 96 DPI 的逻辑值，
+            // CaptureBar 内部要乘上显示器缩放系数，绕过它就会在高 DPI 下偏小。
+            SetLineCount(_input.Lines.Length);
         }
 ```
 
@@ -4268,11 +4269,11 @@ namespace QuickNote
         public void ApplyTheme(Palette palette)
         {
             _palette = palette;
-            BackColor = palette.BarBack.Color;
-            _input.BackColor = palette.BarBack.Color;
+            BackColor = palette.BarBack;
+            _input.BackColor = palette.BarBack;
             _input.ForeColor = palette.Text;
             _input.Font = palette.Body;
-            _queryBox.BackColor = palette.BarBack.Color;
+            _queryBox.BackColor = palette.BarBack;
             _queryBox.ForeColor = palette.Text;
             _queryBox.Font = palette.Body;
             MarkdownHighlighter.Apply(_input, palette);
