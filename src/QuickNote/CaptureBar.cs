@@ -44,6 +44,9 @@ namespace QuickNote
 
         /// <summary>删除确认态。Backspace 进入，Enter 真删，Esc 取消。</summary>
         private bool _confirmDelete;
+
+        /// <summary>进入确认态时选中的那一条。真删之前要比对，见 DoDelete。</summary>
+        private SearchHit _confirmHit;
         private SearchResult _lastResult = SearchResult.Empty();
 
         /// <summary>仅在保存出错后短暂启用，用来把红字提示恢复成常规提示。平时不跑。</summary>
@@ -480,13 +483,16 @@ namespace QuickNote
 
         private void EnterDeleteConfirm()
         {
-            if (_results.SelectedHit == null) return;
+            var hit = _results.SelectedHit;
+            if (hit == null) return;
+
             _confirmDelete = true;
+            _confirmHit = hit;              // 记住确认框里说的是哪一条
             _results.SetDanger(true);
 
             EntryInfo info;
-            EntryLine.TryParse(_results.SelectedHit.Line, out info);
-            var what = info == null ? _results.SelectedHit.Line : info.Content;
+            EntryLine.TryParse(hit.Line, out info);
+            var what = info == null ? hit.Line : info.Content;
             if (what.Length > 20) what = what.Substring(0, 20) + "…";
 
             _chrome.Bottom.Text = "删除「" + what + "」？　Enter 确认　·　Esc 取消";
@@ -497,6 +503,7 @@ namespace QuickNote
         {
             if (!_confirmDelete) return;
             _confirmDelete = false;
+            _confirmHit = null;
             _results.SetDanger(false);
             _chrome.Bottom.ForeColor = _palette.Muted;
             RefreshChrome();
@@ -510,7 +517,15 @@ namespace QuickNote
         private void DoDelete()
         {
             var hit = _results.SelectedHit;
-            if (hit == null) { CancelDeleteConfirm(); return; }
+
+            // 只有选中的还是当初那一条才真删。中间若改了查询词（结果重排、选中回到
+            // 第一条），或用鼠标点了别的行，列表里已经是**另一批**对象了——这时按
+            // Enter 会删掉一条确认框里根本没提过的记录。对象身份就足以识别这件事。
+            if (hit == null || !ReferenceEquals(hit, _confirmHit))
+            {
+                CancelDeleteConfirm();
+                return;
+            }
 
             try
             {
@@ -650,6 +665,7 @@ namespace QuickNote
             _chrome.ApplyHairline(palette.Hairline);
             _caret.SetColors(palette);
             MarkdownHighlighter.Apply(_input, palette);
+            ApplySize();          // 行高跟着字体走，换主题后高度要重算
             Invalidate(true);
         }
 
