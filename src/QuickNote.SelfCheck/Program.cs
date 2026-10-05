@@ -1,0 +1,24 @@
+using System;
+using System.Text;
+
+namespace QuickNote.SelfCheck
+{
+    internal static class Program
+    {
+        private static int Main()
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            try
+            {
+                DateFormatChecks.Run();
+                // 后续任务在此处依次追加
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("自检自身崩溃：" + ex);
+                return 2;
+            }
+            return Check.Report();
+        }
+    }
+}
