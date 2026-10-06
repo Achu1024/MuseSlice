@@ -13,6 +13,7 @@ namespace QuickNote.SelfCheck
                 DateFormatChecks.Run();
                 EntryLineChecks.Run();
                 CaretPulseChecks.Run();
+                CaretBoxChecks.Run();
                 NoteStoreChecks.Run();
                 AppConfigChecks.Run();
                 InputRulesChecks.Run();

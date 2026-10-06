@@ -89,9 +89,14 @@ namespace QuickNote
             NativeMethods.HideCaret(_box.Handle);
 
             var at = _box.GetPositionFromCharIndex(_box.SelectionStart);
-            Location = _host.PointToClient(_box.PointToScreen(at));
+            var local = _host.PointToClient(_box.PointToScreen(at));
+
+            int top, height;
+            Measure(_box.Font, out top, out height);
+
+            Location = new Point(local.X, local.Y + top);
             Width = Math.Max(1, (int)Math.Round(LogicalWidth * _scale));
-            Height = _box.Font.Height;
+            Height = height;
 
             if (!Visible)
             {
@@ -111,6 +116,41 @@ namespace QuickNote
         private void Apply()
         {
             BackColor = Blend(_paper, _ink, CaretPulse.LevelAt(_elapsed));
+        }
+
+        /// <summary>
+        /// 从字体度量里取出「行距」与「字身」，交给 <see cref="CaretBox.Range"/> 算上下范围。
+        /// <para>
+        /// <c>Font.Height</c> 是行距，不是字身：CJK 字体（Noto Sans SC）的行距约 1.45em，
+        /// 而字身只有 1.16em 上下。直接拿它当光标高度，那根线会比文字高出一大截、顶到
+        /// 上面的分隔线。字身由 <c>FontFamily</c> 的升部 + 降部按行距等比换算而来。
+        /// </para>
+        /// </summary>
+        private static void Measure(Font font, out int top, out int height)
+        {
+            if (font == null)
+            {
+                CaretBox.Range(0, 0, 0, out top, out height);
+                return;
+            }
+
+            var family = font.FontFamily;
+            var style = font.Style;
+            var lineSpacing = font.Height;
+            var designLineSpacing = family.GetLineSpacing(style);
+
+            if (designLineSpacing <= 0)
+            {
+                CaretBox.Range(lineSpacing, 0, 0, out top, out height);
+                return;
+            }
+
+            var ascent = (int)Math.Round(
+                (double)lineSpacing * family.GetCellAscent(style) / designLineSpacing);
+            var descent = (int)Math.Round(
+                (double)lineSpacing * family.GetCellDescent(style) / designLineSpacing);
+
+            CaretBox.Range(lineSpacing, ascent, descent, out top, out height);
         }
 
         private static Color Blend(Color paper, Color ink, double level)
