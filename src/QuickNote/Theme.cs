@@ -30,7 +30,6 @@ namespace QuickNote
         public Font Chrome;      // 上下两条辅助信息行
         public Font Heading;     // 标题（加粗，不是换色）
         public Font Mono;        // 行内代码
-        public Font Emoji;       // 两个脸。不指定它的话会被正文 CJK 字体带去黑白字形
     }
 
     internal static class Theme
@@ -84,7 +83,7 @@ namespace QuickNote
                 Chrome = Font(CjkFamilies, 8.5f, FontStyle.Regular),
                 Heading = Font(CjkFamilies, 11f, FontStyle.Bold),
                 Mono = Font(MonoFamilies, 10f, FontStyle.Regular),
-                Emoji = Font(EmojiFamilies, 11f, FontStyle.Regular)
+
             };
         }
 
@@ -106,7 +105,7 @@ namespace QuickNote
                 Chrome = Font(CjkFamilies, 8.5f, FontStyle.Regular),
                 Heading = Font(CjkFamilies, 11f, FontStyle.Bold),
                 Mono = Font(MonoFamilies, 10f, FontStyle.Regular),
-                Emoji = Font(EmojiFamilies, 11f, FontStyle.Regular)
+
             };
         }
 
@@ -119,7 +118,6 @@ namespace QuickNote
             { "Bahnschrift Light", "Bahnschrift", "Consolas" };
 
         private static readonly string[] MonoFamilies = { "Consolas", "Courier New" };
-        private static readonly string[] EmojiFamilies = { "Segoe UI Emoji" };
 
         private static Color Rgb(int r, int g, int b) { return Color.FromArgb(r, g, b); }
 

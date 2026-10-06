@@ -24,9 +24,9 @@ namespace QuickNote
         private static readonly Regex Bold = new Regex(@"\*\*[^*\n]+\*\*", RegexOptions.Compiled);
         private static readonly Regex Code = new Regex(@"`[^`\n]+`", RegexOptions.Compiled);
 
-        /// <summary>填写页那一行开头的脸（"😶‍🌫️ " / "🥳 "）。</summary>
-        private static readonly Regex FaceMarker = new Regex(
-            "^(" + EntryLine.UndoneFace + "|" + EntryLine.DoneFace + ")", RegexOptions.Compiled);
+        /// <summary>填写页那一行开头的勾选框（☐ / ☑）。</summary>
+        private static readonly Regex LeadingMark = new Regex(
+            "^(" + EntryLine.UndoneMark + "|" + EntryLine.DoneMark + ")", RegexOptions.Compiled);
 
         public static void Apply(RichTextBox box, Palette p)
         {
@@ -84,10 +84,10 @@ namespace QuickNote
         {
             var line = text.Substring(start, end - start);
 
-            // 脸必须显式指定 emoji 字体。正文的 CJK 字体不含这些码位，
-            // 交给字体链接去兜的话有可能落到黑白字形上。
-            var face = FaceMarker.Match(line);
-            if (face.Success) Paint(box, start, face.Length, p.Ink, p.Emoji);
+            // 勾选框是结构、不是内容：压成 ink-soft，让正文当主角（与列表符同一套纪律）。
+            // 不用再指定字体——☐/☑ 是普通 BMP 字形，正文 CJK 字体自带，不走字体回退。
+            var mark = LeadingMark.Match(line);
+            if (mark.Success) Paint(box, start, mark.Length, p.InkSoft, p.Body);
 
             // 标题不用颜色，用字重（定案 §2 的「颜色的使用纪律」）。
             if (HeadingLine.IsMatch(line))

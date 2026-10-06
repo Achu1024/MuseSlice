@@ -29,11 +29,11 @@ namespace QuickNote.SelfCheck
             Check.Equal(info.IsDone, false, "未完成行的完成态为 false");
             Check.Equal(info.Stamp, "14:03", "取到时间戳");
             Check.Equal(info.Content, "跟老王确认了接口字段", "取到正文");
-            Check.Equal(info.Face, EntryLine.UndoneFace, "未完成行给未完成的脸");
+            Check.Equal(info.Mark, EntryLine.UndoneMark, "未完成行给未勾选框");
 
             Check.That(EntryLine.TryParse("- [x] 14:03 把 spec 写完", out info), "识别新格式的已完成行");
             Check.Equal(info.IsDone, true, "已完成行的完成态为 true");
-            Check.Equal(info.Face, EntryLine.DoneFace, "已完成行给完成的脸");
+            Check.Equal(info.Mark, EntryLine.DoneMark, "已完成行给已勾选框");
 
             Check.That(EntryLine.TryParse("- [X] 14:03 大写 X", out info), "大写 X 也认");
             Check.Equal(info.IsDone, true, "大写 X 视为已完成");
@@ -47,7 +47,7 @@ namespace QuickNote.SelfCheck
             Check.Equal(info.IsDone, false, "旧格式一律视为未完成");
             Check.Equal(info.Stamp, "20:18", "旧格式也能取到时间戳");
             Check.Equal(info.Content, "下载Minimax", "旧格式也能取到正文");
-            Check.Equal(info.Face, EntryLine.UndoneFace, "旧格式的记录显示未完成的脸");
+            Check.Equal(info.Mark, EntryLine.UndoneMark, "旧格式的记录显示未勾选框");
 
             Check.That(DateFormat.IsEntryStart("- 20:18 下载Minimax"), "DateFormat.IsEntryStart 仍认旧格式");
             Check.That(DateFormat.IsEntryStart("- [ ] 14:03 新格式"), "DateFormat.IsEntryStart 也认新格式");
@@ -70,13 +70,13 @@ namespace QuickNote.SelfCheck
         private static void StripsMarkers()
         {
             bool done;
-            Check.Equal(EntryLine.StripMarker(EntryLine.UndoneFace + " 买牛奶", out done), "买牛奶",
-                "界面的未完成脸被去掉");
-            Check.Equal(done, false, "未完成脸给出未完成态");
+            Check.Equal(EntryLine.StripMarker(EntryLine.UndoneMark + " 买牛奶", out done), "买牛奶",
+                "填写页的未勾选框被去掉");
+            Check.Equal(done, false, "未勾选框给出未完成态");
 
-            Check.Equal(EntryLine.StripMarker(EntryLine.DoneFace + " 买牛奶", out done), "买牛奶",
-                "界面的完成脸被去掉");
-            Check.Equal(done, true, "完成脸给出完成态");
+            Check.Equal(EntryLine.StripMarker(EntryLine.DoneMark + " 买牛奶", out done), "买牛奶",
+                "填写页的已勾选框被去掉");
+            Check.Equal(done, true, "已勾选框给出完成态");
 
             Check.Equal(EntryLine.StripMarker("- [ ] 买牛奶", out done), "买牛奶", "手打的 - [ ] 被去掉");
             Check.Equal(done, false, "手打的 - [ ] 视为未完成");
@@ -85,8 +85,8 @@ namespace QuickNote.SelfCheck
 
             Check.Equal(EntryLine.StripMarker("买牛奶", out done), "买牛奶", "没有标记的普通行原样返回");
             Check.Equal(done, false, "没有标记视为未完成");
-            Check.Equal(EntryLine.StripMarker(EntryLine.UndoneFace, out done), "",
-                "只有脸没有正文时返回空串（保存时会被跳过）");
+            Check.Equal(EntryLine.StripMarker(EntryLine.UndoneMark, out done), "",
+                "只有勾选框没有正文时返回空串（保存时会被跳过）");
             Check.Equal(EntryLine.StripMarker("- 5 分钟后开会", out done), "- 5 分钟后开会",
                 "行首不是勾选标记的短横不被吃掉");
         }

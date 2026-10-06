@@ -211,12 +211,12 @@ namespace QuickNote.SelfCheck
                 var store = new NoteStore(dir.Path);
 
                 // 打了 "- " 会自动补成脸，接着直接回车——不能因此写出一条空待办
-                Check.That(!store.Append(EntryLine.UndoneFace + " ", Day), "只有脸没有正文返回 false");
+                Check.That(!store.Append(EntryLine.UndoneMark + " ", Day), "只有勾选框没有正文返回 false");
                 Check.That(!store.Append("- [ ] ", Day), "只有勾选框没有正文返回 false");
                 Check.That(!Directory.Exists(dir.Path) || Directory.GetFiles(dir.Path).Length == 0,
                     "只有标记的输入不创建任何文件");
 
-                Check.That(store.Append("有内容\n" + EntryLine.UndoneFace + " \n也有内容", Day),
+                Check.That(store.Append("有内容\n" + EntryLine.UndoneMark + " \n也有内容", Day),
                     "夹着空标记行时其余内容照常写入");
 
                 Check.Equal(File.ReadAllText(store.PathFor(Day), Encoding.UTF8),

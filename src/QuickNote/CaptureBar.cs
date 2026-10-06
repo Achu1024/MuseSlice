@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Media;
 using System.Windows.Forms;
 using QuickNote.Core;
 
@@ -24,6 +25,15 @@ namespace QuickNote
 
         /// <summary>上下两条辅助信息行的高度。</summary>
         private const int LogicalChromeLine = 24;
+
+        /// <summary>
+        /// 正文区自己的上下内边距，两条分隔线各让开这么多。
+        /// <para>
+        /// 正文区是 Dock=Fill，不加这道留白的话第一行的行盒顶就直接压在上 hairline 上，
+        /// 光标顶端看着像从线上长出来的；最后一行同理贴着下 hairline。
+        /// </para>
+        /// </summary>
+        private const int LogicalContentPadY = 8;
 
         private Palette _palette;      // 非 readonly：改主题时要换掉
         private NoteStore _store;      // 非 readonly：改日记目录时要换掉
@@ -170,7 +180,7 @@ namespace QuickNote
 
             // 赋值 SelectedText 会再触发一次 TextChangedByUser。回到这里时行首已经
             // 是脸而不是 "- "，上面那道判断自然拦住，不会递归。
-            var face = EntryLine.UndoneFace + " ";
+            var face = EntryLine.UndoneMark + " ";
             box.Select(lineStart, 2);
             box.SelectedText = face;
             box.SelectionStart = lineStart + face.Length;
@@ -248,7 +258,11 @@ namespace QuickNote
             // 文字按 DPI 放大了、留白却没放大，高 DPI 下整张卡片会显得局促。
             var padX = (int)Math.Round(LogicalPadX * _scale);
             var padY = (int)Math.Round(LogicalPadY * _scale);
+            var contentPadY = (int)Math.Round(LogicalContentPadY * _scale);
+
             Padding = new Padding(padX, padY, padX, padY);
+            // 上下各让开 contentPadY：正文与光标都不贴分隔线。
+            _content.Padding = new Padding(0, contentPadY, 0, contentPadY);
             _chrome.Top.Height = ChromeLinePx;
             _chrome.Bottom.Height = ChromeLinePx;
 
@@ -260,8 +274,8 @@ namespace QuickNote
             }
 
             Width = (int)Math.Round(LogicalWidth * _scale);
-            // 高度正好等于「上下内边距 + 上下辅助行 + N 行正文」，一点不多。
-            Height = 2 * padY + 2 * ChromeLinePx + _lineCount * LineHeightPx;
+            // 高度正好等于「上下内边距 + 上下辅助行 + 正文区上下留白 + N 行正文」，一点不多。
+            Height = 2 * padY + 2 * ChromeLinePx + 2 * contentPadY + _lineCount * LineHeightPx;
         }
 
         /// <summary>按内容行数调整高度。</summary>
@@ -368,6 +382,8 @@ namespace QuickNote
 
             if (key == Keys.Tab)
             {
+                QuickNoteApp.Log("DIAG Tab 落在填写页的处理函数上 → "
+                    + (_input.TextLength == 0 ? "切到搜索" : "缩进"));
                 var tab = InputRules.DecideTab(BarMode.Record, _input.TextLength == 0);
                 if (tab == TabAction.Indent) InsertIndent();
                 else if (tab == TabAction.SwitchToSearch) SwitchTo(BarMode.Search);
@@ -402,6 +418,11 @@ namespace QuickNote
                 _chrome.Bottom.ForeColor = _palette.Muted;
                 RefreshChrome();
                 HideBar();
+
+                // 小条一保存就消失了，屏幕上没有任何「存进去了」的痕迹。给一声轻响当回执。
+                // SystemSounds 是异步播放的（PlaySound 带 SND_ASYNC），不会拖住 UI 线程——
+                // 这一条很重要：UI 线程一卡，全局键盘钩子就跟着卡。
+                SystemSounds.Asterisk.Play();
                 return true;
             }
             catch (NoteStoreException ex)
@@ -496,6 +517,7 @@ namespace QuickNote
             if (e.KeyCode == Keys.Tab || e.KeyCode == Keys.Escape)
             {
                 e.SuppressKeyPress = true;
+                QuickNoteApp.Log("DIAG Tab/Esc 落在搜索页的处理函数上 → 切回填写");
                 SwitchTo(BarMode.Record);
             }
         }
@@ -621,6 +643,7 @@ namespace QuickNote
 
         private void SwitchTo(BarMode mode)
         {
+            var before = Width + "x" + Height;
             CancelDeleteConfirm();   // 切模式的瞬间确认态必须失效，否则 Enter 会删掉看不见的东西
             _mode = mode;
             var searching = mode == BarMode.Search;
@@ -650,6 +673,23 @@ namespace QuickNote
                 RefreshChrome();
                 _input.Focus();
             }
+
+            // DIAG（临时）：切完之后尺寸与可见性到底变成什么样、焦点在谁身上。
+            // 「按 Tab 回不去」要么是这一步没跑，要么是焦点压根没到处理函数上。
+            QuickNoteApp.Log("DIAG switch-to " + mode + ": " + before + " -> " + Width + "x" + Height
+                + ", input=" + _input.Visible + ", results=" + _results.Visible
+                + ", searchRow=" + _searchRow.Visible + ", 焦点=" + FocusName());
+        }
+
+        /// <summary>DIAG（临时）：焦点在哪个控件上。</summary>
+        private string FocusName()
+        {
+            var c = ActiveControl;
+            if (c == null) return "(不在本窗体)";
+            if (c == _input) return "input";
+            if (c == _queryBox) return "queryBox";
+            if (c == _results) return "results";
+            return c.GetType().Name;
         }
 
         /// <summary>设置里改了日记目录后，把存储与搜索器一起换掉。</summary>
@@ -682,6 +722,7 @@ namespace QuickNote
             _chrome.Bottom.ForeColor = palette.Muted;
             _searchStatus.ForeColor = palette.Muted;
             _chrome.ApplyHairline(palette.Hairline);
+            _results.ApplyTheme(palette);   // 结果列表自己持有配色，换主题得告诉它
             _caret.SetColors(palette);
             MarkdownHighlighter.Apply(_input, palette);
             ApplySize();          // 行高跟着字体走，换主题后高度要重算

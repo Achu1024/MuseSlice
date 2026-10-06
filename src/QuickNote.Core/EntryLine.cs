@@ -10,8 +10,8 @@ namespace QuickNote.Core
         public string Stamp { get; set; }
         public string Content { get; set; }
 
-        /// <summary>界面上代表这个状态的脸。文件里存的是 "- [ ]" / "- [x]"。</summary>
-        public string Face { get { return IsDone ? EntryLine.DoneFace : EntryLine.UndoneFace; } }
+        /// <summary>界面上代表这个状态的勾选框。文件里存的是 "- [ ]" / "- [x]"。</summary>
+        public string Mark { get { return IsDone ? EntryLine.DoneMark : EntryLine.UndoneMark; } }
     }
 
     /// <summary>
@@ -24,11 +24,19 @@ namespace QuickNote.Core
     /// </summary>
     public static class EntryLine
     {
-        /// <summary>界面上的未完成脸；文件里存 "- [ ]"。</summary>
-        public const string UndoneFace = "😶‍🌫️";
+        /// <summary>
+        /// 填写页的未勾选框；文件里存 "- [ ]"。
+        /// <para>
+        /// 用方块字形而不是 emoji：原先那两个脸（😶‍🌫️ / 🥳）在本机渲染成了黑白，
+        /// 而且 😶‍🌫️ 是 ZWJ 序列（U+1F636 + ZWJ + U+1F32B + VS16），比单个 emoji
+        /// 更容易退化成两截。U+2610 / U+2611 是普通 BMP 字形，Noto Sans SC 自带
+        /// （已量过宽度），不走字体回退，天生就是单色——正好合「界面近乎无彩」。
+        /// </para>
+        /// </summary>
+        public const string UndoneMark = "☐";
 
-        /// <summary>界面上的完成脸；文件里存 "- [x]"。</summary>
-        public const string DoneFace = "🥳";
+        /// <summary>填写页的已勾选框（U+2611）；文件里存 "- [x]"。</summary>
+        public const string DoneMark = "☑";
 
         public const string UndoneBox = "- [ ] ";
         public const string DoneBox = "- [x] ";
@@ -105,8 +113,8 @@ namespace QuickNote.Core
 
             if (StartsWith(line, DoneBox)) { done = true; return line.Substring(DoneBox.Length).Trim(); }
             if (StartsWith(line, UndoneBox)) return line.Substring(UndoneBox.Length).Trim();
-            if (StartsWith(line, DoneFace)) { done = true; return line.Substring(DoneFace.Length).Trim(); }
-            if (StartsWith(line, UndoneFace)) return line.Substring(UndoneFace.Length).Trim();
+            if (StartsWith(line, DoneMark)) { done = true; return line.Substring(DoneMark.Length).Trim(); }
+            if (StartsWith(line, UndoneMark)) return line.Substring(UndoneMark.Length).Trim();
 
             return line.Trim();
         }
