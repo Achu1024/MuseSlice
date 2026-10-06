@@ -33,59 +33,14 @@ namespace QuickNote
 
         protected override void WndProc(ref Message m)
         {
-            // DIAG（临时，查完输入法问题就删）：组合到底有没有开始、输入框有没有中途失焦。
-            if (m.Msg == NativeMethods.WM_IME_STARTCOMPOSITION)
-            {
-                _composing = true;
-                QuickNoteApp.Log("DIAG IME start-composition");
-            }
-            else if (m.Msg == NativeMethods.WM_IME_ENDCOMPOSITION)
-            {
-                _composing = false;
-                QuickNoteApp.Log("DIAG IME end-composition");
-            }
-            else if (m.Msg == NativeMethods.WM_KILLFOCUS)
-            {
-                _composing = false;
-                QuickNoteApp.Log("DIAG input blur");
-            }
-            else if (m.Msg == NativeMethods.WM_SETFOCUS)
-            {
-                QuickNoteApp.Log("DIAG input focus; " + DescribeIme());
-            }
+            if (m.Msg == NativeMethods.WM_IME_STARTCOMPOSITION) _composing = true;
+            else if (m.Msg == NativeMethods.WM_IME_ENDCOMPOSITION) _composing = false;
+            else if (m.Msg == NativeMethods.WM_KILLFOCUS) _composing = false;
             // 失焦时也必须清掉组合态。若某个输入法在切换/销毁组合时没送来
             // WM_IME_ENDCOMPOSITION，这个标志会永远为真，此后每一次 Enter 都被
             // 吞掉——使用者一个字都存不进去，而且没有任何反馈。宁可偶尔误放行
             // 一次 Enter，也不能让保存功能永久失效。
             base.WndProc(ref m);
-        }
-
-        /// <summary>
-        /// DIAG（临时）：把「输入法到底有没有接上这个窗口、是不是在中文模式」写进日志。
-        /// 组合消息一直不来的话，光看组合事件分不清是「输入法没接上」还是「输入法在英文模式」。
-        /// </summary>
-        private string DescribeIme()
-        {
-            var font = "字体=" + Font.Name + "/" + Font.SizeInPoints.ToString("0.#") + "pt";
-
-            var imc = NativeMethods.ImmGetContext(Handle);
-            if (imc == IntPtr.Zero) return "输入法上下文=无; " + font;
-
-            try
-            {
-                int conversion, sentence;
-                if (!NativeMethods.ImmGetConversionStatus(imc, out conversion, out sentence))
-                    return "输入法上下文=有，转换状态读不到; " + font;
-
-                var native = (conversion & NativeMethods.IME_CMODE_NATIVE) != 0;
-                return "输入法上下文=有，转换状态=0x" + conversion.ToString("X4")
-                    + (native ? "（中文模式）" : "（英文/字母数字模式）")
-                    + "; " + font;
-            }
-            finally
-            {
-                NativeMethods.ImmReleaseContext(Handle, imc);
-            }
         }
 
         protected override void OnTextChanged(EventArgs e)

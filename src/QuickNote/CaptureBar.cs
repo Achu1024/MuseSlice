@@ -61,8 +61,6 @@ namespace QuickNote
         /// <summary>进入确认态时选中的那一条。真删之前要比对，见 DoDelete。</summary>
         private SearchHit _confirmHit;
 
-        /// <summary>DIAG（临时）：同一个输入法组合里只记一次「组合期间文本变更」。</summary>
-        private bool _loggedComposingChange;
         private SearchResult _lastResult = SearchResult.Empty();
 
         /// <summary>仅在保存出错后短暂启用，用来把红字提示恢复成常规提示。平时不跑。</summary>
@@ -132,19 +130,6 @@ namespace QuickNote
             };
             box.TextChangedByUser += delegate
             {
-                // DIAG（临时）：文本变更发生在组合期间的话，高亮器的 SelectAll 就会
-                // 把 IME 的组合串掀掉——那正是「打不出中文」最可能的机制。同一个组合
-                // 里只记第一次，免得刷屏。
-                if (box.IsComposing && !_loggedComposingChange)
-                {
-                    _loggedComposingChange = true;
-                    QuickNoteApp.Log("DIAG text-change WHILE composing");
-                }
-                else if (!box.IsComposing)
-                {
-                    _loggedComposingChange = false;
-                }
-
                 ExpandTodoMarker(box);
                 MarkdownHighlighter.Apply(box, _palette);
                 FitToContent();

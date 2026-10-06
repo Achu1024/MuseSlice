@@ -17,28 +17,11 @@ namespace QuickNote
 
         internal const int WM_IME_STARTCOMPOSITION = 0x010D;
         internal const int WM_IME_ENDCOMPOSITION = 0x010E;
-        internal const int WM_SETFOCUS = 0x0007;
         internal const int WM_KILLFOCUS = 0x0008;
 
         /// <summary>藏掉系统画的插入符。自绘光标要用它把 RichEdit 那根 1px 黑条顶掉。</summary>
         [DllImport("user32.dll")]
         internal static extern bool HideCaret(IntPtr hWnd);
-
-        // ---- 输入法状态（DIAG 用）----
-        // 组合消息没来，就得先问「这个窗口到底有没有输入法上下文、输入法是不是在中文模式」。
-
-        internal const int IME_CMODE_NATIVE = 0x0001;
-
-        [DllImport("imm32.dll")]
-        internal static extern IntPtr ImmGetContext(IntPtr hWnd);
-
-        [DllImport("imm32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool ImmGetConversionStatus(IntPtr hIMC, out int conversion, out int sentence);
-
-        [DllImport("imm32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool ImmReleaseContext(IntPtr hWnd, IntPtr hIMC);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         internal static extern uint RegisterWindowMessage(string lpString);
