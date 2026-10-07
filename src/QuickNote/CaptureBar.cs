@@ -696,7 +696,20 @@ namespace QuickNote
             // 「按 Tab 回不去」要么是这一步没跑，要么是焦点压根没到处理函数上。
             QuickNoteApp.Log("DIAG switch-to " + mode + ": " + before + " -> " + Width + "x" + Height
                 + ", input=" + _input.Visible + ", results=" + _results.Visible
-                + ", searchRow=" + _searchRow.Visible + ", 焦点=" + FocusName());
+                + ", searchRow=" + _searchRow.Visible + ", 焦点=" + FocusName()
+                + ", 调用者=" + CallerName());
+        }
+
+        /// <summary>
+        /// DIAG（临时）：谁调的 SwitchTo。启动时出现了一行 switch-to，而 Main 里没有
+        /// 任何地方会调它，使用者又说小条不会自己弹——所以要直接问调用栈，别再猜。
+        /// </summary>
+        private static string CallerName()
+        {
+            var frames = new System.Diagnostics.StackTrace(2, false);
+            if (frames.FrameCount == 0) return "(未知)";
+            var m = frames.GetFrame(0).GetMethod();
+            return (m.DeclaringType == null ? "" : m.DeclaringType.Name + ".") + m.Name;
         }
 
         /// <summary>DIAG（临时）：焦点在哪个控件上。</summary>

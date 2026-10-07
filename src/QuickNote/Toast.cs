@@ -22,12 +22,18 @@ namespace QuickNote
     /// </summary>
     internal sealed class Toast : Form
     {
-        private const int LifeMs = 1500;
+        // 三个阶段合成一次出现：淡入 → 停住 → 淡出。硬出现的提示会「啪」地跳出来，
+        // 硬消失的会像被掐断；两头都淡，才像一口气读完然后自然散去。
+        private const int StepMs = 20;         // 50fps，够顺了
+        private const int FadeInMs = 180;
+        private const int HoldMs = 2000;
+        private const int FadeOutMs = 350;
 
         private readonly Timer _life;
         private Palette _p;
         private string _text = "";
         private float _scale = 1f;
+        private int _elapsed;
 
         private Rectangle _markRect;
         private Rectangle _textRect;
@@ -61,8 +67,8 @@ namespace QuickNote
             SetStyle(ControlStyles.ResizeRedraw | ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
 
-            _life = new Timer { Interval = LifeMs };
-            _life.Tick += delegate { _life.Stop(); Hide(); };
+            _life = new Timer { Interval = StepMs };
+            _life.Tick += delegate { Step(); };
 
             // 先把控件建出来并留下句柄，之后 Show 只是把它显示出来。
             var unused = Handle;
@@ -85,9 +91,44 @@ namespace QuickNote
             Position();
             Invalidate();
 
+            // 从全透明开始重新走一遍淡入。连着保存两次时，第二次会从头淡入，
+            // 而不是接着上一次的淡出往下走——看起来才像「又记了一笔」。
+            _elapsed = 0;
+            Opacity = 0;
             _life.Stop();
             _life.Start();
             Show();
+        }
+
+        /// <summary>一次节拍：按已经过去的时间决定现在的不透明度。</summary>
+        private void Step()
+        {
+            _elapsed += StepMs;
+
+            if (_elapsed < FadeInMs)
+            {
+                Opacity = (double)_elapsed / FadeInMs;
+                return;
+            }
+
+            var held = _elapsed - FadeInMs;
+            if (held < HoldMs)
+            {
+                if (Opacity < 1.0) Opacity = 1.0;
+                return;
+            }
+
+            var fading = held - HoldMs;
+            if (fading >= FadeOutMs)
+            {
+                // 藏起来之后把表停掉：待机时进程里不该有任何计时器在跑。
+                _life.Stop();
+                Hide();
+                Opacity = 0;
+                return;
+            }
+
+            Opacity = 1.0 - (double)fading / FadeOutMs;
         }
 
         public void ApplyTheme(Palette palette)
