@@ -94,6 +94,21 @@ namespace QuickNote
             if (h != null) h();
         }
 
+        /// <summary>
+        /// 在不再触发 TextChangedByUser 的前提下执行一段操作。
+        /// <para>
+        /// 重排只改格式，但 RichEdit 会为此送出 EN_CHANGE——于是「上屏 → 重排」这一下
+        /// 又变成一次文本变更，把调用方再拽回来一趟。用它把自己引发的通知挡掉。
+        /// </para>
+        /// </summary>
+        public void WithoutTextChanged(Action work)
+        {
+            var previous = _suppress;
+            _suppress = true;
+            try { work(); }
+            finally { _suppress = previous; }
+        }
+
         /// <summary>在不再触发 TextChangedByUser 的前提下替换全文（供测试与程序化填充使用）。</summary>
         public void ReplaceTextSilently(string text)
         {

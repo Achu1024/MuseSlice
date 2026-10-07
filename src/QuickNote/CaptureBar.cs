@@ -146,14 +146,26 @@ namespace QuickNote
                 // 重排格式、组合字体与正文不一致）都已被证否，所以不再猜第三条——
                 // GetPositionFromCharIndex(0).Y 就是第一个字符的纵坐标，它变了就是文字动了。
                 // 只在数值真的变化时记一行，免得刷屏。
+                LogLayoutIfMoved(box);
+
+                // 文本没变就**整段早退**。重排本身会引发 EN_CHANGE（RichEdit 为格式变化
+                // 送出的），所以一次上屏会走进来三次；只挡住重排不够——FitToContent 与
+                // caret 也照样跑，而 FitToContent 里的 ApplySize 会设 Padding、两条
+                // chrome 的高度、宽高，每一项都可能触发一次布局重排。三次叠在一起就是
+                // 「抖」。文本没变，这一整段本来就没有任何事可做。
+                if (!box.IsComposing && box.Text == _highlighted)
+                {
+                    if (_diagLines++ < 60)
+                        QuickNoteApp.Log("DIAG 文本变更: 长度=" + box.TextLength + " [文本未变，整段跳过]");
+                    return;
+                }
+
                 if (_diagLines++ < 60)
                 {
                     QuickNoteApp.Log("DIAG 文本变更: 组合中=" + box.IsComposing
                         + " 长度=" + box.TextLength
-                        + (box.IsComposing ? " [组合中，不重排]"
-                           : (box.Text == _highlighted ? " [文本未变，不重排]" : " [重排]")));
+                        + (box.IsComposing ? " [组合中，跳过]" : " [重排]"));
                 }
-                LogLayoutIfMoved(box);
 
                 // 输入法组合期间**什么都不做**：那段时间文本归 IME 管。
                 // 高亮器每次都会给全文重设字体、关开重绘、再 ScrollToCaret 把视图
@@ -204,7 +216,9 @@ namespace QuickNote
             var text = box.Text;
             if (_highlighted != null && text == _highlighted) return;
             _highlighted = text;
-            MarkdownHighlighter.Apply(box, _palette);
+            // 关掉「文本变更」通知再重排：RichEdit 会为格式变化送出 EN_CHANGE，
+            // 不关的话这次重排会把自己再拽回来一趟（日志里那两次「文本未变」）。
+            box.WithoutTextChanged(delegate { MarkdownHighlighter.Apply(box, _palette); });
         }
 
         /// <summary>DIAG（临时）：首字纵坐标或窗体高度一变就记一行。</summary>
