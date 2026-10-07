@@ -75,19 +75,22 @@ namespace QuickNote
         /// </summary>
         private void PromptFirstRun()
         {
-            // 显式写全名：System.Threading 也在这个文件的 using 里，Timer 有歧义
             var once = new System.Windows.Forms.Timer { Interval = 400 };
             once.Tick += delegate
             {
                 once.Stop();
                 once.Dispose();
-                _tray.Balloon("QuickNote", "第一次运行，先确认一下设置。以后可以在托盘菜单里改。");
+
+                // 先教怎么把它叫出来——这是唯一一次「教怎么用」的机会。
+                // 看完再去确认设置：设置页讲的是配置，而使用者此刻还不知道
+                // 这个东西平时在哪、怎么喊出来。
+                using (var card = new WelcomeCard(_palette)) card.ShowDialog();
                 OpenSettings();
             };
             once.Start();
         }
 
-        /// <summary>保存成功的回执：一声「叮咚」+ 右下角闪一下「已记录」。</summary>
+        /// <summary>保存成功的回执：一声「咔嚓」+ 右下角闪一下「已记录」。</summary>
         private void OnSaved()
         {
             SaveChime.Play();

@@ -451,7 +451,6 @@ namespace QuickNote
                 _store.Append(text, DateTime.Now);
                 _input.Clear();
                 _draft = "";
-                _chrome.Bottom.ForeColor = _palette.Muted;
                 RefreshChrome();
                 HideBar();
 
@@ -466,8 +465,7 @@ namespace QuickNote
             {
                 // 最关键的一条：内容绝不清空。让使用者能把内容复制走。
                 QuickNoteApp.Log(ex.Message);
-                _chrome.Bottom.Text = "保存失败，内容已保留：" + ex.Message;
-                _chrome.Bottom.ForeColor = _palette.Error;
+                _chrome.Bottom.SetPlain("保存失败，内容已保留：" + ex.Message, _palette.Error);
                 StartErrorReset();
                 return false;
             }
@@ -481,7 +479,6 @@ namespace QuickNote
                 _errorReset.Tick += delegate
                 {
                     _errorReset.Stop();
-                    _chrome.Bottom.ForeColor = _palette.Muted;
                     RefreshChrome();
                 };
             }
@@ -505,12 +502,30 @@ namespace QuickNote
             {
                 _chrome.Top.Text = "搜索条目";
                 if (_confirmDelete) return;      // 确认文案由 EnterDeleteConfirm 负责，别覆盖掉
-                _chrome.Bottom.Text = "↑↓ 选择　·　空格 完成　·　Backspace 删除　·　Enter 打开　·　Tab 返回";
+
+                _chrome.Bottom.SetHint(
+                    KeyHint.Key("↑↓", KeyHint.Gap.None), KeyHint.Word("选择"),
+                    KeyHint.Word("·", KeyHint.Gap.Wide),
+                    KeyHint.Key("空格"), KeyHint.Word("完成"),
+                    KeyHint.Word("·", KeyHint.Gap.Wide),
+                    KeyHint.Key("退格"), KeyHint.Word("删除"),
+                    KeyHint.Word("·", KeyHint.Gap.Wide),
+                    KeyHint.Key("Enter"), KeyHint.Word("打开"),
+                    KeyHint.Word("·", KeyHint.Gap.Wide),
+                    KeyHint.Key("Esc"), KeyHint.Word("返回"));
             }
             else
             {
                 _chrome.Top.Text = TopText();
-                _chrome.Bottom.Text = "Enter 保存　·　Shift+Enter 换行　·　Tab 搜索";
+
+                _chrome.Bottom.SetHint(
+                    KeyHint.Key("Enter", KeyHint.Gap.None), KeyHint.Word("保存"),
+                    KeyHint.Word("·", KeyHint.Gap.Wide),
+                    KeyHint.Key("Shift+Enter"), KeyHint.Word("换行"),
+                    KeyHint.Word("·", KeyHint.Gap.Wide),
+                    KeyHint.Key("Tab"), KeyHint.Word("搜索"),
+                    KeyHint.Word("·", KeyHint.Gap.Wide),
+                    KeyHint.Key("Esc"), KeyHint.Word("收起"));
             }
         }
 
@@ -570,8 +585,7 @@ namespace QuickNote
             var what = info == null ? hit.Line : info.Content;
             if (what.Length > 20) what = what.Substring(0, 20) + "…";
 
-            _chrome.Bottom.Text = "删除「" + what + "」？　Enter 确认　·　Esc 取消";
-            _chrome.Bottom.ForeColor = _palette.Error;
+            _chrome.Bottom.SetPlain("删除「" + what + "」？　Enter 确认　·　Esc 取消", _palette.Error);
         }
 
         private void CancelDeleteConfirm()
@@ -580,7 +594,6 @@ namespace QuickNote
             _confirmDelete = false;
             _confirmHit = null;
             _results.SetDanger(false);
-            _chrome.Bottom.ForeColor = _palette.Muted;
             RefreshChrome();
         }
 
@@ -765,8 +778,7 @@ namespace QuickNote
             _queryBox.BackColor = palette.Paper;
             _queryBox.ForeColor = palette.Ink;
             _queryBox.Font = palette.Body;
-            _chrome.Top.ForeColor = palette.Muted;
-            _chrome.Bottom.ForeColor = palette.Muted;
+            _chrome.ApplyTheme(palette);
             _searchStatus.ForeColor = palette.Muted;
             _chrome.ApplyHairline(palette.Hairline);
             _results.ApplyTheme(palette);   // 结果列表自己持有配色，换主题得告诉它
