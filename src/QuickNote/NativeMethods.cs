@@ -75,8 +75,26 @@ namespace QuickNote
                     ? before.lfFaceName + " 高" + before.lfHeight
                     : "(读不到)";
 
-                var want = new LOGFONT();
-                font.ToLogFont(want);
+                // 手工填，不用 Font.ToLogFont(object)：那个方法靠反射往传入对象上写字段，
+                // 而结构体会被装箱成一份副本——方法填的是箱子，本地这个字段一个都不会变
+                // （实测就是这样：日志里打出 `→ 高0`，字体名是空的）。
+                // lfHeight 取正值 = 单元格高度，正好等于 Font.Height，也就是行距——
+                // 我们要的就是「组合串那一行的行高与正文一致」。
+                var want = new LOGFONT
+                {
+                    lfHeight = font.Height,
+                    lfWeight = font.Bold ? 700 : 400,
+                    lfItalic = (byte)(font.Italic ? 1 : 0),
+                    lfUnderline = 0,
+                    lfStrikeOut = 0,
+                    lfCharSet = font.GdiCharSet,
+                    lfOutPrecision = 0,
+                    lfClipPrecision = 0,
+                    lfQuality = 5,          // CLEARTYPE_QUALITY，与正文的渲染方式一致
+                    lfPitchAndFamily = 0,
+                    lfFaceName = font.Name
+                };
+
                 ImmSetCompositionFont(imc, ref want);
 
                 return was + "  →  " + want.lfFaceName + " 高" + want.lfHeight;
