@@ -13,6 +13,13 @@ namespace QuickNote
         private readonly MessageWindow _messageWindow;
         private HotkeyManager _hotkeys;
         private NoteStore _store;      // 非 readonly：Task 13 改日记目录时要换掉
+
+        /// <summary>与 _bar 共用同一套配色。绝不每次用都新建——Palette 里握着 Font，
+        /// 反复新建会累积 GDI 句柄（那是有上限的资源，不是普通内存）。</summary>
+        private Palette _palette;
+
+        /// <summary>右下角的回执。第一次保存时才建，整个程序只有一个实例。</summary>
+        private Toast _toast;
         private CaptureBar _bar;
 
         public QuickNoteApp()
@@ -32,7 +39,9 @@ namespace QuickNote
             _tray.SettingsRequested += OpenSettings;
             _tray.AutoStartToggled += ToggleAutoStart;
 
-            _bar = new CaptureBar(Theme.Current(_config.Theme), _store);
+            _palette = Theme.Current(_config.Theme);
+            _bar = new CaptureBar(_palette, _store);
+            _bar.Saved += OnSaved;
 
             _hotkeys = new HotkeyManager(_config);
             _hotkeys.Degraded += delegate (string reason)
@@ -49,6 +58,15 @@ namespace QuickNote
             // 「打开今天的日记」会因目录缺失抛异常，而使用者看不到任何反馈。
             try { Directory.CreateDirectory(_config.NotesDir); }
             catch (Exception ex) { Log("创建笔记目录失败：" + ex.Message); }
+        }
+
+        /// <summary>保存成功的回执：一声「叮咚」+ 右下角闪一下「已记录」。</summary>
+        private void OnSaved()
+        {
+            SaveChime.Play();
+
+            if (_toast == null) _toast = new Toast(_palette);
+            _toast.Pop("已记录", _palette);
         }
 
         private void ShowBar()
@@ -105,7 +123,9 @@ namespace QuickNote
                 _store = new NoteStore(_config.NotesDir);
                 _bar.SetStore(_store);
                 _hotkeys.ApplyConfigChange();
-                _bar.ApplyTheme(Theme.Current(_config.Theme));
+                _palette = Theme.Current(_config.Theme);
+                _bar.ApplyTheme(_palette);
+                if (_toast != null) _toast.ApplyTheme(_palette);
                 if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
                 _tray.SetAutoStartChecked(_config.AutoStart);
                 _tray.Balloon("QuickNote", "设置已保存");

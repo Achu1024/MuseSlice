@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Media;
 using System.Windows.Forms;
 using QuickNote.Core;
 
@@ -214,6 +213,9 @@ namespace QuickNote
             row.Controls.Add(_searchStatus);
             return row;
         }
+
+        /// <summary>保存成功。回执音与右下角的提示由 QuickNoteApp 接。</summary>
+        public event Action Saved;
 
         /// <summary>记录模式的草稿（未保存的内容）。退出前要拿它问一句。</summary>
         public string Draft { get { return _input.Text; } }
@@ -437,10 +439,11 @@ namespace QuickNote
                 RefreshChrome();
                 HideBar();
 
-                // 小条一保存就消失了，屏幕上没有任何「存进去了」的痕迹。给一声轻响当回执。
-                // SystemSounds 是异步播放的（PlaySound 带 SND_ASYNC），不会拖住 UI 线程——
-                // 这一条很重要：UI 线程一卡，全局键盘钩子就跟着卡。
-                SystemSounds.Asterisk.Play();
+                // 小条一保存就消失了，屏幕上没有任何「存进去了」的痕迹。
+                // 回执（一声「叮咚」+ 右下角闪一下）由 QuickNoteApp 负责——它才拿得到
+                // 托盘与回执窗口；这里只报「存成了」。
+                var saved = Saved;
+                if (saved != null) saved();
                 return true;
             }
             catch (NoteStoreException ex)

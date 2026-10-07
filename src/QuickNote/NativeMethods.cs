@@ -94,6 +94,10 @@ namespace QuickNote
 
         // ---- 窗口外观（Task 8）----
 
+        /// <summary>让回执窗口只被画出来、不进前台，也不出现在 Alt+Tab 里。</summary>
+        internal const int WS_EX_NOACTIVATE = 0x08000000;
+        internal const int WS_EX_TOOLWINDOW = 0x00000080;
+
         internal const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
         internal const int DWMWCP_ROUND = 2;
         internal const int CS_DROPSHADOW = 0x00020000;
