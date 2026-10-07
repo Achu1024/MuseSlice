@@ -10,8 +10,9 @@ namespace QuickNote.SelfCheck
         {
             Check.Section("Chime");
             WavHeaderIsWellFormed();
-            WavActuallyCarriesSound();
-            SecondNoteIsLowerThanFirst();
+            IsATransientNotATone();
+            SecondBurstIsSofterThanTheFirst();
+            IsDeterministic();
         }
 
         /// <summary>
@@ -44,60 +45,79 @@ namespace QuickNote.SelfCheck
             }
         }
 
-        private static void WavActuallyCarriesSound()
-        {
-            var wav = Chime.Wav();
-            var samples = ReadSamples(wav);
-
-            Check.That(samples.Length > Chime.SampleRate / 8,
-                "长度够听（至少 125 毫秒）");
-            Check.That(samples.Length < Chime.SampleRate,
-                "长度克制（不到 1 秒，别拖住保存这个动作）");
-
-            var nonZero = 0;
-            var peak = 0;
-            foreach (var s in samples)
-            {
-                var v = s < 0 ? -s : s;
-                if (v > 0) nonZero++;
-                if (v > peak) peak = v;
-            }
-
-            Check.That(nonZero > samples.Length / 2, "大部分采样非零——不是一段静音");
-            Check.That(peak > short.MaxValue / 8, "音量不是小到听不见");
-            Check.That(peak < short.MaxValue, "没有削波（削波听起来是「咔」不是「叮咚」）");
-
-            Check.Equal(samples[0], (short)0, "第一个采样是 0：从 0 起音，否则会「啪」一声");
-            Check.That(Math.Abs((int)samples[samples.Length - 1]) < short.MaxValue / 16,
-                "尾巴衰减到接近 0，不会截断成「咔」");
-        }
-
-        /// <summary>「叮咚」是先高后低。只能从零交叉率上看出来，因为波形本身没法「听」。</summary>
-        private static void SecondNoteIsLowerThanFirst()
+        /// <summary>
+        /// 这是撞击声，不是音：**能量必须是「一下就没」的形状**。
+        /// 先前那版叮咚响 320 毫秒、二次谐波落在 2.6kHz（人耳最敏感那一段），
+        /// 听着刺耳。改成快门之后要有两条相反的保证：够短、开头就最响。
+        /// </summary>
+        private static void IsATransientNotATone()
         {
             var samples = ReadSamples(Chime.Wav());
+            var ms = samples.Length * 1000.0 / Chime.SampleRate;
 
-            // 两段各取靠前的一段，那时衰减还没把振幅压下去
-            var firstEnd = (int)(0.08 * Chime.SampleRate);
-            var secondStart = (int)(0.13 * Chime.SampleRate);
-            var secondEnd = (int)(0.21 * Chime.SampleRate);
+            Check.That(ms > 50, "不短于 50 毫秒——太短会连播放器开音频设备的时间都不够");
+            Check.That(ms < 150, "不超过 150 毫秒——超过这个长度就从「脆」变成「尖」了");
 
-            var first = ZeroCrossings(samples, 0, firstEnd);
-            var second = ZeroCrossings(samples, secondStart, secondEnd);
+            // 峰值必须出现在开头：撞击声的定义就是这个
+            var peakAt = 0;
+            var peak = 0;
+            for (var i = 0; i < samples.Length; i++)
+            {
+                var v = Math.Abs((int)samples[i]);
+                if (v > peak) { peak = v; peakAt = i; }
+            }
 
-            Check.That(first > second,
-                "第一声比第二声高（「叮」在上、「咚」在下）");
-            Check.That(second > 0, "第二声确实响了，不是一段静音");
+            Check.That(peak > short.MaxValue / 8, "音量不是小到听不见");
+            Check.That(peak < short.MaxValue, "没有削波（削波听起来是「啪」不是「咔」）");
+            Check.That(peakAt < Chime.SampleRate * 0.03,
+                "峰值落在头 30 毫秒内——是瞬态，不是一段音");
+            Check.That(Math.Abs((int)samples[0]) > 0 || Math.Abs((int)samples[1]) > 0,
+                "一开头就有声，不是渐入");
+
+            // 尾巴要落回接近 0，否则截断处会「咔」一声
+            Check.That(Math.Abs((int)samples[samples.Length - 1]) < peak / 8,
+                "结尾衰减到峰值的八分之一以下，不会被截断成第二个咔哒");
         }
 
-        private static int ZeroCrossings(short[] samples, int from, int to)
+        /// <summary>快门是「咔-嚓」两下，第二下更轻。用两段的能量比来验。</summary>
+        private static void SecondBurstIsSofterThanTheFirst()
         {
-            var count = 0;
-            for (var i = from + 1; i < to && i < samples.Length; i++)
+            var samples = ReadSamples(Chime.Wav());
+            var split = Chime.SecondBurstAtMs * Chime.SampleRate / 1000;
+
+            Check.That(split < samples.Length, "第二下的起点在文件之内");
+
+            var first = Energy(samples, 0, split);
+            var second = Energy(samples, split, samples.Length);
+
+            Check.That(second > 0, "第二下确实响了，不是一段静音");
+            Check.That(first > second, "第一下比第二下响（「咔」在前、「嚓」在后）");
+        }
+
+        /// <summary>
+        /// 噪声种子固定，两次合成必须逐字节一致。
+        /// 这一条不是洁癖：使用者试听的候选就是这份波形，写进程序后必须是同一个声音。
+        /// </summary>
+        private static void IsDeterministic()
+        {
+            var a = Chime.Wav();
+            var b = Chime.Wav();
+
+            Check.Equal(a.Length, b.Length, "两次合成的长度一致");
+
+            var same = a.Length == b.Length;
+            for (var i = 0; same && i < a.Length; i++)
             {
-                if ((samples[i - 1] < 0) != (samples[i] < 0)) count++;
+                if (a[i] != b[i]) same = false;
             }
-            return count;
+            Check.That(same, "两次合成逐字节一致——种子没有漂移");
+        }
+
+        private static double Energy(short[] samples, int from, int to)
+        {
+            var sum = 0.0;
+            for (var i = from; i < to && i < samples.Length; i++) sum += (double)samples[i] * samples[i];
+            return sum;
         }
 
         private static short[] ReadSamples(byte[] wav)
