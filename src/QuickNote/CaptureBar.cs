@@ -63,6 +63,10 @@ namespace QuickNote
         /// <summary>进入确认态时选中的那一条。真删之前要比对，见 DoDelete。</summary>
         private SearchHit _confirmHit;
 
+        /// <summary>DIAG（临时）：上一次记下的首字纵坐标与窗体高度。</summary>
+        private int _lastTextTop = int.MinValue;
+        private int _lastFormHeight = int.MinValue;
+
         private SearchResult _lastResult = SearchResult.Empty();
 
         /// <summary>仅在保存出错后短暂启用，用来把红字提示恢复成常规提示。平时不跑。</summary>
@@ -132,6 +136,12 @@ namespace QuickNote
             };
             box.TextChangedByUser += delegate
             {
+                // DIAG（临时）：直接量「文字有没有移动」。前面两条假设（高亮器在组合期间
+                // 重排格式、组合字体与正文不一致）都已被证否，所以不再猜第三条——
+                // GetPositionFromCharIndex(0).Y 就是第一个字符的纵坐标，它变了就是文字动了。
+                // 只在数值真的变化时记一行，免得刷屏。
+                LogLayoutIfMoved(box);
+
                 // 输入法组合期间**什么都不做**：那段时间文本归 IME 管。
                 // 高亮器每次都会给全文重设字体、关开重绘、再 ScrollToCaret 把视图
                 // 拉回原处——而组合中字符索引和组合串边界都处于中间态，这三下都会
@@ -158,6 +168,27 @@ namespace QuickNote
             box.GotFocus += delegate { _caret.Attach(box, _content, _scale); };
             box.LostFocus += delegate { _caret.Stop(); };
             return box;
+        }
+
+        /// <summary>DIAG（临时）：首字纵坐标或窗体高度一变就记一行。</summary>
+        private void LogLayoutIfMoved(BarTextBox box)
+        {
+            int top, formHeight, lines;
+            try
+            {
+                top = box.GetPositionFromCharIndex(0).Y;
+                formHeight = Height;
+                lines = box.GetLineFromCharIndex(box.TextLength) + 1;
+            }
+            catch { return; }
+
+            if (top == _lastTextTop && formHeight == _lastFormHeight) return;
+            _lastTextTop = top;
+            _lastFormHeight = formHeight;
+
+            QuickNoteApp.Log("DIAG 布局变化: 首字y=" + top + " 窗体高=" + formHeight
+                + " 输入框高=" + box.Height + " 行数=" + lines
+                + " 组合中=" + box.IsComposing + " 长度=" + box.TextLength);
         }
 
         /// <summary>
