@@ -132,7 +132,23 @@ namespace QuickNote
             };
             box.TextChangedByUser += delegate
             {
+                // 输入法组合期间**什么都不做**：那段时间文本归 IME 管。
+                // 高亮器每次都会给全文重设字体、关开重绘、再 ScrollToCaret 把视图
+                // 拉回原处——而组合中字符索引和组合串边界都处于中间态，这三下都会
+                // 让文字跳。中文输入时看到「文字抖动、往下沉」就是这么来的。
+                // 组合结束后补一次即可（见下面的 CompositionEnded）。
+                if (box.IsComposing) return;
+
                 ExpandTodoMarker(box);
+                MarkdownHighlighter.Apply(box, _palette);
+                FitToContent();
+                _caret.Follow();
+            };
+
+            // 组合结束后补上：组合期间跳过了着色，而那次上屏的文本变更又先于
+            // WM_IME_ENDCOMPOSITION 到达，已经被上面挡掉了。
+            box.CompositionEnded += delegate
+            {
                 MarkdownHighlighter.Apply(box, _palette);
                 FitToContent();
                 _caret.Follow();

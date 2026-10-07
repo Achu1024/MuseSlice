@@ -31,16 +31,33 @@ namespace QuickNote
         /// <summary>文本确实发生变化时触发。重着色只改格式、不改文本，因此不会触发它。</summary>
         public event Action TextChangedByUser;
 
+        /// <summary>
+        /// 输入法组合结束。组合期间调用方会跳过一切改格式的操作（那段时间文本归 IME 管），
+        /// 所以结束后要补一次高亮。
+        /// </summary>
+        public event Action CompositionEnded;
+
         protected override void WndProc(ref Message m)
         {
+            // 组合结束时，上屏的文本变更**先于** WM_IME_ENDCOMPOSITION 到达
+            // （实测日志里就是这个顺序），所以那一次的 TextChangedByUser 会被
+            // 「组合中，跳过」挡掉。得在这里再补一次，否则刚打完的中文没有高亮。
+            var endedComposition = m.Msg == NativeMethods.WM_IME_ENDCOMPOSITION;
+
             if (m.Msg == NativeMethods.WM_IME_STARTCOMPOSITION) _composing = true;
-            else if (m.Msg == NativeMethods.WM_IME_ENDCOMPOSITION) _composing = false;
+            else if (endedComposition) _composing = false;
             else if (m.Msg == NativeMethods.WM_KILLFOCUS) _composing = false;
             // 失焦时也必须清掉组合态。若某个输入法在切换/销毁组合时没送来
             // WM_IME_ENDCOMPOSITION，这个标志会永远为真，此后每一次 Enter 都被
             // 吞掉——使用者一个字都存不进去，而且没有任何反馈。宁可偶尔误放行
             // 一次 Enter，也不能让保存功能永久失效。
             base.WndProc(ref m);
+
+            if (endedComposition)
+            {
+                var h = CompositionEnded;
+                if (h != null) h();
+            }
         }
 
         protected override void OnTextChanged(EventArgs e)
