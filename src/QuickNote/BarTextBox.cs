@@ -14,6 +14,9 @@ namespace QuickNote
         private bool _composing;
         private bool _suppress;
 
+        /// <summary>DIAG（临时）：组合字体只记一次，免得每次弹出小条都写一行日志。</summary>
+        private bool _imeFontLogged;
+
         public BarTextBox()
         {
             BorderStyle = BorderStyle.None;
@@ -44,9 +47,32 @@ namespace QuickNote
             // 「组合中，跳过」挡掉。得在这里再补一次，否则刚打完的中文没有高亮。
             var endedComposition = m.Msg == NativeMethods.WM_IME_ENDCOMPOSITION;
 
-            if (m.Msg == NativeMethods.WM_IME_STARTCOMPOSITION) _composing = true;
+            if (m.Msg == NativeMethods.WM_IME_STARTCOMPOSITION)
+            {
+                _composing = true;
+
+                // 每次组合开始前再压一遍组合字体：输入法在某些情况下会把它重置回默认值，
+                // 而默认值的行高与正文不同——那正是「文字抖动下沉」的来源。
+                NativeMethods.SyncCompositionFont(Handle, Font);
+            }
             else if (endedComposition) _composing = false;
             else if (m.Msg == NativeMethods.WM_KILLFOCUS) _composing = false;
+            else if (m.Msg == NativeMethods.WM_SETFOCUS)
+            {
+                // DIAG（临时）：第一次拿到焦点时，把输入法**当前**的组合字体记下来。
+                // 如果它和正文字体不一样，就证实了「组合期间行高变了」这条推断；
+                // 如果本来就一样，那真凶另有其人，别在这条路上继续修。
+                if (!_imeFontLogged)
+                {
+                    _imeFontLogged = true;
+                    QuickNoteApp.Log("DIAG 组合字体同步: " + NativeMethods.SyncCompositionFont(Handle, Font)
+                        + "；正文=" + Font.Name + " 高" + Font.Height);
+                }
+                else
+                {
+                    NativeMethods.SyncCompositionFont(Handle, Font);
+                }
+            }
             // 失焦时也必须清掉组合态。若某个输入法在切换/销毁组合时没送来
             // WM_IME_ENDCOMPOSITION，这个标志会永远为真，此后每一次 Enter 都被
             // 吞掉——使用者一个字都存不进去，而且没有任何反馈。宁可偶尔误放行

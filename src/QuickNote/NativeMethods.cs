@@ -17,7 +17,79 @@ namespace QuickNote
 
         internal const int WM_IME_STARTCOMPOSITION = 0x010D;
         internal const int WM_IME_ENDCOMPOSITION = 0x010E;
+        internal const int WM_SETFOCUS = 0x0007;
         internal const int WM_KILLFOCUS = 0x0008;
+
+        // ---- 输入法组合字体 ----
+        // 中文打字时文字会抖、往下沉：IME 用**自己默认的组合字体**画组合串，那个字体的
+        // 行高与正文字体不同，于是行盒高度在组合前后变化，整行文字就跟着上下跳。
+        // 对策是在拿到焦点、以及每次组合开始前，把组合字体同步成正文字体。
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        internal struct LOGFONT
+        {
+            public int lfHeight;
+            public int lfWidth;
+            public int lfEscapement;
+            public int lfOrientation;
+            public int lfWeight;
+            public byte lfItalic;
+            public byte lfUnderline;
+            public byte lfStrikeOut;
+            public byte lfCharSet;
+            public byte lfOutPrecision;
+            public byte lfClipPrecision;
+            public byte lfQuality;
+            public byte lfPitchAndFamily;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public string lfFaceName;
+        }
+
+        [DllImport("imm32.dll")]
+        internal static extern IntPtr ImmGetContext(IntPtr hWnd);
+
+        [DllImport("imm32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool ImmReleaseContext(IntPtr hWnd, IntPtr hIMC);
+
+        [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool ImmGetCompositionFont(IntPtr hIMC, ref LOGFONT lf);
+
+        [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool ImmSetCompositionFont(IntPtr hIMC, ref LOGFONT lf);
+
+        /// <summary>把输入法的组合字体同步成控件的字体。返回同步前它的样子（供诊断）。</summary>
+        internal static string SyncCompositionFont(IntPtr hWnd, System.Drawing.Font font)
+        {
+            if (font == null) return "(没有字体)";
+
+            var imc = ImmGetContext(hWnd);
+            if (imc == IntPtr.Zero) return "(没有输入法上下文)";
+
+            try
+            {
+                var before = new LOGFONT();
+                var was = ImmGetCompositionFont(imc, ref before)
+                    ? before.lfFaceName + " 高" + before.lfHeight
+                    : "(读不到)";
+
+                var want = new LOGFONT();
+                font.ToLogFont(want);
+                ImmSetCompositionFont(imc, ref want);
+
+                return was + "  →  " + want.lfFaceName + " 高" + want.lfHeight;
+            }
+            catch
+            {
+                return "(同步时出错)";
+            }
+            finally
+            {
+                ImmReleaseContext(hWnd, imc);
+            }
+        }
 
         /// <summary>藏掉系统画的插入符。自绘光标要用它把 RichEdit 那根 1px 黑条顶掉。</summary>
         [DllImport("user32.dll")]

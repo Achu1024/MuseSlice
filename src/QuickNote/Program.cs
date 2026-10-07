@@ -24,6 +24,9 @@ namespace QuickNote
 
         public QuickNoteApp()
         {
+            // 「首次安装」的判据就是配置文件还不存在。AppConfig.Load 在文件缺失时
+            // 只用默认值、**不写文件**，所以这个判据得在 Load 之前取。
+            var firstRun = !File.Exists(AppConfig.DefaultConfigPath());
             _config = AppConfig.Load(AppConfig.DefaultConfigPath());
             _store = new NoteStore(_config.NotesDir);
 
@@ -58,6 +61,30 @@ namespace QuickNote
             // 「打开今天的日记」会因目录缺失抛异常，而使用者看不到任何反馈。
             try { Directory.CreateDirectory(_config.NotesDir); }
             catch (Exception ex) { Log("创建笔记目录失败：" + ex.Message); }
+
+            if (firstRun) PromptFirstRun();
+        }
+
+        /// <summary>
+        /// 首次安装：把设置页推给使用者。默认值能用，但日记目录这种东西不该让人
+        /// 自己去猜、也不该等到发现「日记不知道存哪去了」才回来找。
+        /// <para>
+        /// 延后一拍再弹，不在构造函数里直接 ShowDialog：那时消息循环还没跑起来，
+        /// 托盘图标也还没出现，弹一个模态框会让人不知道它是谁弹的。
+        /// </para>
+        /// </summary>
+        private void PromptFirstRun()
+        {
+            // 显式写全名：System.Threading 也在这个文件的 using 里，Timer 有歧义
+            var once = new System.Windows.Forms.Timer { Interval = 400 };
+            once.Tick += delegate
+            {
+                once.Stop();
+                once.Dispose();
+                _tray.Balloon("QuickNote", "第一次运行，先确认一下设置。以后可以在托盘菜单里改。");
+                OpenSettings();
+            };
+            once.Start();
         }
 
         /// <summary>保存成功的回执：一声「叮咚」+ 右下角闪一下「已记录」。</summary>
@@ -113,7 +140,7 @@ namespace QuickNote
 
         private void OpenSettings()
         {
-            using (var dlg = new SettingsDialog(_config))
+            using (var dlg = new SettingsDialog(_config, _palette))
             {
                 if (dlg.ShowDialog() != DialogResult.OK) return;
             }
