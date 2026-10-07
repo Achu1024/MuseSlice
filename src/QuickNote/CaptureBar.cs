@@ -70,6 +70,9 @@ namespace QuickNote
         /// <summary>DIAG（临时）：日志行数上限，免得刷屏。</summary>
         private int _diagLines;
 
+        /// <summary>上一次重排时的文本，见 Highlight。null 表示还没排过。</summary>
+        private string _highlighted;
+
         private SearchResult _lastResult = SearchResult.Empty();
 
         /// <summary>仅在保存出错后短暂启用，用来把红字提示恢复成常规提示。平时不跑。</summary>
@@ -147,7 +150,8 @@ namespace QuickNote
                 {
                     QuickNoteApp.Log("DIAG 文本变更: 组合中=" + box.IsComposing
                         + " 长度=" + box.TextLength
-                        + (box.IsComposing ? " [跳过，不重排]" : " [重排]"));
+                        + (box.IsComposing ? " [组合中，不重排]"
+                           : (box.Text == _highlighted ? " [文本未变，不重排]" : " [重排]")));
                 }
                 LogLayoutIfMoved(box);
 
@@ -159,7 +163,7 @@ namespace QuickNote
                 if (box.IsComposing) return;
 
                 ExpandTodoMarker(box);
-                MarkdownHighlighter.Apply(box, _palette);
+                Highlight(box);
                 FitToContent();
                 _caret.Follow();
             };
@@ -172,7 +176,7 @@ namespace QuickNote
                 {
                     QuickNoteApp.Log("DIAG 组合结束: 长度=" + box.TextLength + " [重排]");
                 }
-                MarkdownHighlighter.Apply(box, _palette);
+                Highlight(box);
                 FitToContent();
                 _caret.Follow();
             };
@@ -181,6 +185,26 @@ namespace QuickNote
             box.GotFocus += delegate { _caret.Attach(box, _content, _scale); };
             box.LostFocus += delegate { _caret.Stop(); };
             return box;
+        }
+
+        /// <summary>
+        /// 重排的入口。**文本没变就不重排。**
+        /// <para>
+        /// 重排只改格式，但 RichEdit 会为此送出 EN_CHANGE——于是「组合结束」里那次
+        /// 重排又触发一次 TextChangedByUser，同一个字符连着重排三遍。而每次重排都要
+        /// 关开重绘 + 全量重画，几次挨在一起看着就是「抖」。这在中文上必然发生
+        /// （组合串的格式在上屏时变过），拉丁字母则不会——这就是为什么只有中文抖。
+        /// </para>
+        /// <para>
+        /// 文本没变就没有重排的理由：重排是幂等的，同样的文本重排出来是同样的结果。
+        /// </para>
+        /// </summary>
+        private void Highlight(BarTextBox box)
+        {
+            var text = box.Text;
+            if (_highlighted != null && text == _highlighted) return;
+            _highlighted = text;
+            MarkdownHighlighter.Apply(box, _palette);
         }
 
         /// <summary>DIAG（临时）：首字纵坐标或窗体高度一变就记一行。</summary>
@@ -856,7 +880,7 @@ namespace QuickNote
             SwitchTo(BarMode.Record);          // 默认进记录模式，不记忆上次
             _input.Text = _draft;
             _input.SelectionStart = _input.TextLength;
-            MarkdownHighlighter.Apply(_input, _palette);
+            Highlight(_input);
             FitToContent();
             ShowBar();
             _input.Focus();
