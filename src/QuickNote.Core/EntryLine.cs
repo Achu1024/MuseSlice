@@ -25,18 +25,22 @@ namespace QuickNote.Core
     public static class EntryLine
     {
         /// <summary>
-        /// 填写页的未勾选框；文件里存 "- [ ]"。
+        /// 界面上代表未勾选的图标；文件里存 "- [ ]"。
         /// <para>
-        /// 用方块字形而不是 emoji：原先那两个脸（😶‍🌫️ / 🥳）在本机渲染成了黑白，
-        /// 而且 😶‍🌫️ 是 ZWJ 序列（U+1F636 + ZWJ + U+1F32B + VS16），比单个 emoji
-        /// 更容易退化成两截。U+2610 / U+2611 是普通 BMP 字形，Noto Sans SC 自带
-        /// （已量过宽度），不走字体回退，天生就是单色——正好合「界面近乎无彩」。
+        /// 取的是 Windows 自带图标字体 Segoe Fluent Icons（Win10 上是 Segoe MDL2 Assets）
+        /// 里的「Checkbox」码位——一套专业设计的单色矢量图标，零第三方依赖。
+        /// 两个码位在两种字体里都确认存在（宽度 21.8，缺字基准 5.3）。
+        /// </para>
+        /// <para>
+        /// 不用 emoji 的原因：原先那两个脸（😶‍🌫️ / 🥳）在本机渲染成了黑白，而且
+        /// 😶‍🌫️ 是 ZWJ 序列（U+1F636 + ZWJ + U+1F32B + VS16），比单个 emoji
+        /// 更容易退化成两截。图标字体天生单色，正好合「界面近乎无彩」。
         /// </para>
         /// </summary>
-        public const string UndoneMark = "☐";
+        public const string UndoneMark = "\uE739";
 
-        /// <summary>填写页的已勾选框（U+2611）；文件里存 "- [x]"。</summary>
-        public const string DoneMark = "☑";
+        /// <summary>界面上代表已勾选的图标（同款方框 + 勾）；文件里存 "- [x]"。</summary>
+        public const string DoneMark = "\uE73A";
 
         public const string UndoneBox = "- [ ] ";
         public const string DoneBox = "- [x] ";

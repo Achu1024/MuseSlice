@@ -30,6 +30,7 @@ namespace QuickNote
         public Font Chrome;      // 上下两条辅助信息行
         public Font Heading;     // 标题（加粗，不是换色）
         public Font Mono;        // 行内代码
+        public Font Icon;        // 勾选框的图标字形（Windows 自带的图标字体）
     }
 
     internal static class Theme
@@ -83,6 +84,7 @@ namespace QuickNote
                 Chrome = Font(CjkFamilies, 8.5f, FontStyle.Regular),
                 Heading = Font(CjkFamilies, 11f, FontStyle.Bold),
                 Mono = Font(MonoFamilies, 10f, FontStyle.Regular),
+                Icon = Font(IconFamilies, 11f, FontStyle.Regular),
 
             };
         }
@@ -105,6 +107,7 @@ namespace QuickNote
                 Chrome = Font(CjkFamilies, 8.5f, FontStyle.Regular),
                 Heading = Font(CjkFamilies, 11f, FontStyle.Bold),
                 Mono = Font(MonoFamilies, 10f, FontStyle.Regular),
+                Icon = Font(IconFamilies, 11f, FontStyle.Regular),
 
             };
         }
@@ -117,6 +120,11 @@ namespace QuickNote
         private static readonly string[] NumeralFamilies =
             { "Bahnschrift Light", "Bahnschrift", "Consolas" };
 
+        // Windows 自带的图标字体：Win11 是 Segoe Fluent Icons，Win10 是 Segoe MDL2 Assets。
+        // 勾选框的图标字形从这里取——一套专业设计的单色矢量图标，零第三方依赖，
+        // 放大不糊，也不像 emoji 那样会退回黑白。
+        private static readonly string[] IconFamilies =
+            { "Segoe Fluent Icons", "Segoe MDL2 Assets" };
         private static readonly string[] MonoFamilies = { "Consolas", "Courier New" };
 
         private static Color Rgb(int r, int g, int b) { return Color.FromArgb(r, g, b); }

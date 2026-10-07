@@ -85,9 +85,10 @@ namespace QuickNote
             var line = text.Substring(start, end - start);
 
             // 勾选框是结构、不是内容：压成 ink-soft，让正文当主角（与列表符同一套纪律）。
-            // 不用再指定字体——☐/☑ 是普通 BMP 字形，正文 CJK 字体自带，不走字体回退。
+            // 字体必须显式指定成图标字体——这两个码位在 Unicode 私用区，正文的 CJK
+            // 字体没有它们，指望字体链接去兜是兜不到的，会画成豆腐块。
             var mark = LeadingMark.Match(line);
-            if (mark.Success) Paint(box, start, mark.Length, p.InkSoft, p.Body);
+            if (mark.Success) Paint(box, start, mark.Length, p.InkSoft, p.Icon);
 
             // 标题不用颜色，用字重（定案 §2 的「颜色的使用纪律」）。
             if (HeadingLine.IsMatch(line))

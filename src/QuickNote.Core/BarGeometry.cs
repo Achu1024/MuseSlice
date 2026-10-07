@@ -32,5 +32,18 @@ namespace QuickNote.Core
             if (lineCount > MaxLines) return MaxLines;
             return lineCount;
         }
+
+        /// <summary>
+        /// 搜索模式的高度：想要的高度与「屏幕下方还剩多少」取小，再兜一个下限。
+        /// <para>
+        /// 搜索条目比填写页高得多（一条三行、字号又都是按 DPI 放大的），
+        /// 470 逻辑像素乘上 1.25 就可能探出屏幕底部——小条是从上方三分之一处往下长的。
+        /// </para>
+        /// </summary>
+        public static int FitSearchHeight(int desired, int roomBelow, int minHeight)
+        {
+            var height = desired < roomBelow ? desired : roomBelow;
+            return height < minHeight ? minHeight : height;
+        }
     }
 }

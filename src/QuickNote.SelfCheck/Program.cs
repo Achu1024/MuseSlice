@@ -14,6 +14,7 @@ namespace QuickNote.SelfCheck
                 EntryLineChecks.Run();
                 CaretPulseChecks.Run();
                 CaretBoxChecks.Run();
+                SearchHeightChecks.Run();
                 NoteStoreChecks.Run();
                 AppConfigChecks.Run();
                 InputRulesChecks.Run();

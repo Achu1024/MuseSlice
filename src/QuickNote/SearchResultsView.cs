@@ -95,7 +95,9 @@ namespace QuickNote
             _pad = S(10);
             _gap = S(2);
             _topPad = S(4);
-            _markSize = S(13);
+            // 勾选框的宽度由图标字体自己的行高决定：字形是从那儿取的，
+            // 给窄了 TextRenderer 会裁掉右边。
+            _markSize = Math.Max(S(13), _p.Icon.Height);
 
             // 各段都留出余量：TextRenderer 传矩形画时是**裁剪**到矩形的，
             // 矩形正好等于字高时，一个取整误差就会切掉降部。
@@ -177,8 +179,12 @@ namespace QuickNote
                 var y = (i - _firstVisible) * _rowHeight;
                 if (i == _selected)
                 {
+                    // 圆角，并且四周留出一点缝：整张卡片本身是圆的，一条顶到边的直角
+                    // 底纹在它里面显得生硬，像是贴上去的而不是选中的一行。
+                    var band = new Rectangle(S(3), y + S(2), Width - S(6), _rowHeight - S(5));
+                    using (var path = RoundedRect(band, S(7)))
                     using (var b = new SolidBrush(_danger ? Color.FromArgb(46, _p.Error) : _p.Selection))
-                        g.FillRectangle(b, 0, y, Width, _rowHeight - 1);
+                        g.FillPath(b, path);
                 }
 
                 var hit = _result.Hits[i];
@@ -243,45 +249,39 @@ namespace QuickNote
         }
 
         /// <summary>
-        /// 画勾选框。矢量画的，不依赖任何字体的字形——所以放大不会糊，也不会像 emoji
-        /// 那样在本机退回黑白。不画方框画圆：整块界面近乎无彩，圆比方框软，也更像
-        /// 「一个状态」而不是「一个表单控件」。
+        /// 画勾选框。取 Windows 自带图标字体（Segoe Fluent Icons / Segoe MDL2 Assets）
+        /// 里的两个「Checkbox」字形——一套专业设计的单色矢量图标，零第三方依赖，
+        /// 放大不糊，也不像 emoji 那样会退回黑白。填写页用的是同一对字形，
+        /// 所以两处的勾选框长得一模一样。
         /// </summary>
         private void DrawMark(Graphics g, bool done, Rectangle box)
         {
-            var d = Math.Min(box.Width, box.Height);
-            if (d < 4) return;
+            var mark = done ? EntryLine.DoneMark : EntryLine.UndoneMark;
+            TextRenderer.DrawText(g, mark, _p.Icon, box, _p.InkSoft,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+        }
 
-            var r = new Rectangle(box.X, box.Y + (box.Height - d) / 2, d, d);
-            r.Inflate(-1, -1);
-            if (r.Width < 3 || r.Height < 3) return;
+        /// <summary>
+        /// 圆角矩形路径。GDI+ 没有现成的，用四段圆弧拼。半径大到放不下时退回直角，
+        /// 免得 AddArc 抛出或者画出翻卷的图形。
+        /// </summary>
+        private static GraphicsPath RoundedRect(Rectangle r, int radius)
+        {
+            var path = new GraphicsPath();
+            var d = radius * 2;
 
-            if (!done)
+            if (d <= 0 || d > r.Width || d > r.Height)
             {
-                using (var pen = new Pen(_p.Muted, Math.Max(1f, d * 0.11f)))
-                    g.DrawEllipse(pen, r);
-                return;
+                path.AddRectangle(r);
+                return path;
             }
 
-            using (var b = new SolidBrush(_p.InkSoft))
-                g.FillEllipse(b, r);
-
-            // 勾用纸色描，等于在实心圆上挖出来——比再画一个深色的勾干净
-            using (var pen = new Pen(_p.Paper, Math.Max(1f, d * 0.15f)))
-            {
-                pen.StartCap = LineCap.Round;
-                pen.EndCap = LineCap.Round;
-                pen.LineJoin = LineJoin.Round;
-
-                var x = (float)r.X; var ty = (float)r.Y;
-                var w = (float)r.Width; var h = (float)r.Height;
-                g.DrawLines(pen, new[]
-                {
-                    new PointF(x + w * 0.27f, ty + h * 0.52f),
-                    new PointF(x + w * 0.44f, ty + h * 0.70f),
-                    new PointF(x + w * 0.75f, ty + h * 0.31f)
-                });
-            }
+            path.AddArc(r.X, r.Y, d, d, 180, 90);
+            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
         }
 
         /// <summary>

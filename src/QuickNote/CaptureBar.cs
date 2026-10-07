@@ -14,7 +14,10 @@ namespace QuickNote
         /// <summary>设计基准尺寸（96 DPI 下的逻辑像素）。</summary>
         private const int LogicalWidth = 560;
         private const int LogicalSearchWidth = 600;
-        private const int LogicalSearchHeight = 470;
+        private const int LogicalSearchHeight = 560;
+
+        /// <summary>搜索模式的兜底高度：屏幕再矮也不让它塌成一条。</summary>
+        private const int LogicalSearchMinHeight = 240;
 
         /// <summary>
         /// 内边距。两件事都靠它：一是卡片四角的圆弧让开，圆角才不会被内容压出直角；
@@ -254,7 +257,15 @@ namespace QuickNote
             if (_mode == BarMode.Search)
             {
                 Width = (int)Math.Round(LogicalSearchWidth * _scale);
-                Height = (int)Math.Round(LogicalSearchHeight * _scale);
+
+                // 结果列表的每一条是三行文字，行高又按字体真实尺寸算（125% 下约 96px），
+                // 所以搜索模式比填写页高得多。小条是从上方三分之一处往下长的，
+                // 不钳的话会探出屏幕底部。
+                var wa = Screen.FromPoint(Cursor.Position).WorkingArea;
+                var room = wa.Bottom - (wa.Top + wa.Height / 3) - (int)Math.Round(20 * _scale);
+                Height = BarGeometry.FitSearchHeight(
+                    (int)Math.Round(LogicalSearchHeight * _scale), room,
+                    (int)Math.Round(LogicalSearchMinHeight * _scale));
                 return;
             }
 
@@ -345,9 +356,31 @@ namespace QuickNote
         /// </summary>
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (_mode != BarMode.Record) return base.ProcessCmdKey(ref msg, keyData);
-
             var key = keyData & Keys.KeyCode;
+
+            // 搜索模式的 Tab / Esc 也要在这里兜，不能只挂在 _queryBox.KeyDown 上。
+            // 理由和下面注释里写的是同一个：Tab 与 Esc 都是「对话框键」，在
+            // ProcessDialogKey 阶段就被消费掉了，压根到不了控件的 OnKeyDown。
+            // 搜索页原先只挂了 _queryBox.KeyDown，所以按 Tab 毫无反应——
+            // 表现就是「卡在搜索界面回不去」。
+            if (_mode != BarMode.Record)
+            {
+                if (key == Keys.Tab)
+                {
+                    QuickNoteApp.Log("DIAG Tab/Esc 落在搜索页的处理函数上 → 切回填写");
+                    SwitchTo(BarMode.Record);
+                    return true;
+                }
+                if (key == Keys.Escape)
+                {
+                    QuickNoteApp.Log("DIAG Tab/Esc 落在搜索页的处理函数上 → 切回填写");
+                    if (_confirmDelete) CancelDeleteConfirm();   // 确认态下 Esc 是「取消」
+                    else SwitchTo(BarMode.Record);
+                    return true;
+                }
+                return base.ProcessCmdKey(ref msg, keyData);
+            }
+
             var shift = (keyData & Keys.Shift) == Keys.Shift;
 
             if (key == Keys.Enter)
@@ -499,12 +532,9 @@ namespace QuickNote
             }
 
             if (e.KeyCode == Keys.Enter) { _results.ActivateSelected(); e.SuppressKeyPress = true; return; }
-            if (e.KeyCode == Keys.Tab || e.KeyCode == Keys.Escape)
-            {
-                e.SuppressKeyPress = true;
-                QuickNoteApp.Log("DIAG Tab/Esc 落在搜索页的处理函数上 → 切回填写");
-                SwitchTo(BarMode.Record);
-            }
+
+            // Tab / Esc 不在这里处理：它们是对话框键，到不了这个 KeyDown。
+            // 统一由窗体上的 ProcessCmdKey 兜（见那里）。
         }
 
         private void EnterDeleteConfirm()
