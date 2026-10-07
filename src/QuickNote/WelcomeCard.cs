@@ -106,7 +106,8 @@ namespace QuickNote
                 Size = new Size(innerWidth, S(34)),
                 Location = new Point(pad, y)
             };
-            _ok.Click += delegate { Close(); };
+            // 点「知道了」= 看完了，接着去设置页
+            _ok.Click += delegate { DialogResult = DialogResult.OK; Close(); };
             Controls.Add(_ok);
             AcceptButton = _ok;
             y += _ok.Height + pad;
@@ -142,8 +143,25 @@ namespace QuickNote
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Escape) Close();
+            if (e.KeyCode == Keys.Escape) Close();   // 与失焦同一个语义
             base.OnKeyDown(e);
+        }
+
+        /// <summary>
+        /// 失焦即关，与小条的 Esc 是同一套语义：**走开就收起来，不赖在屏幕上**。
+        /// <para>
+        /// 这张卡片是 TopMost 的，不这么做的话，使用者一点别处它就会一直盖在最上层，
+        /// 除非专门回来点「知道了」——第一印象就成了「关不掉的弹窗」。
+        /// </para>
+        /// <para>
+        /// 但它与点「知道了」不同：**关掉不等于看完了**，所以不接着弹设置页。
+        /// 别人明确点了按钮才代表他准备好继续。
+        /// </para>
+        /// </summary>
+        protected override void OnDeactivate(EventArgs e)
+        {
+            base.OnDeactivate(e);
+            if (!IsDisposed) Close();
         }
 
         protected override void Dispose(bool disposing)

@@ -67,6 +67,9 @@ namespace QuickNote
         private int _lastTextTop = int.MinValue;
         private int _lastFormHeight = int.MinValue;
 
+        /// <summary>DIAG（临时）：日志行数上限，免得刷屏。</summary>
+        private int _diagLines;
+
         private SearchResult _lastResult = SearchResult.Empty();
 
         /// <summary>仅在保存出错后短暂启用，用来把红字提示恢复成常规提示。平时不跑。</summary>
@@ -140,6 +143,12 @@ namespace QuickNote
                 // 重排格式、组合字体与正文不一致）都已被证否，所以不再猜第三条——
                 // GetPositionFromCharIndex(0).Y 就是第一个字符的纵坐标，它变了就是文字动了。
                 // 只在数值真的变化时记一行，免得刷屏。
+                if (_diagLines++ < 60)
+                {
+                    QuickNoteApp.Log("DIAG 文本变更: 组合中=" + box.IsComposing
+                        + " 长度=" + box.TextLength
+                        + (box.IsComposing ? " [跳过，不重排]" : " [重排]"));
+                }
                 LogLayoutIfMoved(box);
 
                 // 输入法组合期间**什么都不做**：那段时间文本归 IME 管。
@@ -159,6 +168,10 @@ namespace QuickNote
             // WM_IME_ENDCOMPOSITION 到达，已经被上面挡掉了。
             box.CompositionEnded += delegate
             {
+                if (_diagLines++ < 60)
+                {
+                    QuickNoteApp.Log("DIAG 组合结束: 长度=" + box.TextLength + " [重排]");
+                }
                 MarkdownHighlighter.Apply(box, _palette);
                 FitToContent();
                 _caret.Follow();
@@ -318,9 +331,16 @@ namespace QuickNote
                 return;
             }
 
+            var oldHeight = Height;
             Width = (int)Math.Round(LogicalWidth * _scale);
             // 高度正好等于「上下内边距 + 上下辅助行 + 正文区上下留白 + N 行正文」，一点不多。
             Height = 2 * padY + 2 * ChromeLinePx + 2 * contentPadY + _lineCount * LineHeightPx;
+
+            if (Height != oldHeight && _diagLines++ < 60)
+            {
+                QuickNoteApp.Log("DIAG 窗口尺寸变化: 高 " + oldHeight + " -> " + Height
+                    + " 行数=" + _lineCount + " 倍率=" + _scale);
+            }
         }
 
         /// <summary>按内容行数调整高度。</summary>

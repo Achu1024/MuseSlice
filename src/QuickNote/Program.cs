@@ -28,6 +28,15 @@ namespace QuickNote
             // 只用默认值、**不写文件**，所以这个判据得在 Load 之前取。
             var firstRun = !File.Exists(AppConfig.DefaultConfigPath());
             _config = AppConfig.Load(AppConfig.DefaultConfigPath());
+
+            // 立刻把默认配置落盘：否则使用者若把首次那张卡片直接点掉、没进设置页，
+            // 配置文件就始终不存在，下次启动又算「首次安装」——卡片每次都弹，
+            // 那就成了他躲不掉的弹窗。首次只有一次。
+            if (firstRun)
+            {
+                try { _config.Save(AppConfig.DefaultConfigPath()); }
+                catch (Exception ex) { Log("写入默认配置失败：" + ex.Message); }
+            }
             _store = new NoteStore(_config.NotesDir);
 
             var showMessage = NativeMethods.RegisterWindowMessage("QuickNote.Show");
