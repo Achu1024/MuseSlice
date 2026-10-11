@@ -8,6 +8,7 @@ obj/
 # 发布包走 GitHub Releases，不进版本库
 dist/
 *.zip
+.release-payload.json
 
 # 编辑器 / 工具目录
 .claude/
