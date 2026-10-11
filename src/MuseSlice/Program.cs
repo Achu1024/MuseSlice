@@ -102,7 +102,7 @@ namespace MuseSlice
                 // 先教怎么把它叫出来——这是唯一一次「教怎么用」的机会。
                 // 看完再去确认设置：设置页讲的是配置，而使用者此刻还不知道
                 // 这个东西平时在哪、怎么喊出来。
-                using (var card = new WelcomeCardNew(_palette)) card.ShowDialog();
+                using (var card = new WelcomeCard(_palette)) card.ShowDialog();
                 OpenSettings();
             };
             once.Start();
@@ -177,7 +177,7 @@ namespace MuseSlice
 
         private void OpenSettings()
         {
-            using (var dlg = new SettingsDialogNew(_config, _palette))
+            using (var dlg = new SettingsDialog(_config, _palette))
             {
                 if (dlg.ShowDialog() != DialogResult.OK) return;
             }

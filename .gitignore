@@ -5,10 +5,15 @@ notes/
 bin/
 obj/
 
+# 发布包走 GitHub Releases，不进版本库
+dist/
+*.zip
+
+# 编辑器 / 工具目录
+.claude/
+.vs/
+.idea/
+
 # 头脑风暴会话产物（视觉伴侣的 mockup）
 .superpowers/
 docs/superpowers/
-
-# 发布包走 GitHub Releases，不进版本库
-*.zip
-dist/

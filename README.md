@@ -110,6 +110,7 @@ src/MuseSlice/            WinForms 界面：输入条、托盘、设置
 src/MuseSlice.SelfCheck/  自检用例，不依赖测试框架
 installer/                Inno Setup 安装脚本
 tools/make_icon.py        从品牌图生成多尺寸 .ico
+docs/design/              界面设计稿（不是构建产物）
 ```
 
 改完代码跑一遍自检：
