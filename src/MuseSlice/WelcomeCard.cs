@@ -1,0 +1,194 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using MuseSlice.Core;
+
+namespace MuseSlice
+{
+    /// <summary>
+    /// 首次运行那一张卡片：告诉使用者怎么把它叫出来。
+    /// <para>
+    /// 这是整个程序里唯一一次「教怎么用」的机会。它要说清的只有一件事——
+    /// **双击左 Ctrl**。所以那句话用最大的字号、最重的字重、并且画成键帽，
+    /// 其余全是陪衬。
+    /// </para>
+    /// <para>
+    /// 无边框圆角带投影，居中。用的键帽画法与底下那条提示行是同一套
+    /// （<see cref="KeyHint"/>），只是字号大得多——这样「那个能按的东西」在两张
+    /// 地方的样貌是一致的，使用者认得出。
+    /// </para>
+    /// </summary>
+    internal sealed class WelcomeCard : Form
+    {
+        private const int LogicalWidth = 430;
+
+        private readonly Palette _p;
+        private readonly float _scale;
+        private readonly Font _big;
+
+        private KeyHint.Part[] _headline;
+        private Rectangle _headlineRect;
+        private Rectangle _bodyRect;
+        private Rectangle _markRect;
+        private Rectangle _brandTextRect;
+        private Button _ok;
+
+        public WelcomeCard(Palette palette)
+        {
+            _p = palette;
+            _scale = DetectScale();
+
+            // 整张卡片里最大的一处字。用正文的家族、放大加粗——不引第三套字体。
+            _big = new Font(_p.Body.FontFamily, 15f, FontStyle.Bold);
+
+            FormBorderStyle = FormBorderStyle.None;
+            StartPosition = FormStartPosition.CenterScreen;
+            ShowInTaskbar = false;
+            TopMost = true;
+            BackColor = _p.Paper;
+            KeyPreview = true;
+            DoubleBuffered = true;
+            SetStyle(ControlStyles.ResizeRedraw | ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
+
+            Build();
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                var cp = base.CreateParams;
+                cp.ClassStyle |= NativeMethods.CS_DROPSHADOW;
+                return cp;
+            }
+        }
+
+        private int S(int logical) { return (int)Math.Round(logical * _scale); }
+
+        private float DetectScale()
+        {
+            try
+            {
+                using (var g = CreateGraphics()) return g.DpiX / 96f;
+            }
+            catch { return 1f; }
+        }
+
+        private void Build()
+        {
+            var pad = S(30);
+            var innerWidth = S(LogicalWidth) - pad * 2;
+            var y = pad;
+
+            // 品牌行。这是使用者第一次看清这个程序叫什么的地方——教程讲了「怎么唤出」，
+            // 但没讲「你是谁」，所以标志和名字放在最上面。
+            var brandRow = S(30);
+            var markHeight = S(26);
+            var markWidth = (int)Math.Round(markHeight * LogoMark.Aspect);
+            _markRect = new Rectangle(pad, y + (brandRow - markHeight) / 2, markWidth, markHeight);
+
+            using (var g = CreateGraphics())
+            {
+                var textWidth = TextRenderer.MeasureText(g, Brand.Name, _p.Heading).Width;
+                _brandTextRect = new Rectangle(pad + markWidth + S(10), y, textWidth, brandRow);
+            }
+            y += brandRow + S(20);
+
+            _headline = new[]
+            {
+                KeyHint.Key("双击左 Ctrl", KeyHint.Gap.None)
+            };
+
+            // 键帽比字高一点，这里给足
+            var headlineHeight = _big.Height + S(14);
+            _headlineRect = new Rectangle(pad, y, innerWidth, headlineHeight);
+            y += headlineHeight + S(14);
+
+            var body = "随时唤出小条，写下就存进当天的日记。\n之后也可以在托盘图标上点右键找到它。";
+            _bodyRect = new Rectangle(pad, y, innerWidth, 0);
+
+            using (var g = CreateGraphics())
+            {
+                var size = TextRenderer.MeasureText(g, body, _p.Body,
+                    new Size(innerWidth, 0), TextFormatFlags.WordBreak);
+                _bodyRect.Height = size.Height + S(4);
+            }
+            y += _bodyRect.Height + S(26);
+
+            _ok = new Button
+            {
+                Text = "知道了",
+                Font = _p.Body,
+                Size = new Size(innerWidth, S(34)),
+                Location = new Point(pad, y)
+            };
+            // 点「知道了」= 看完了，接着去设置页
+            _ok.Click += delegate { DialogResult = DialogResult.OK; Close(); };
+            Controls.Add(_ok);
+            AcceptButton = _ok;
+            y += _ok.Height + pad;
+
+            ClientSize = new Size(S(LogicalWidth), y);
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            try
+            {
+                var pref = NativeMethods.DWMWCP_ROUND;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE,
+                    ref pref, sizeof(int));
+            }
+            catch { /* 非 Win11 上忽略 */ }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(_p.Paper);
+
+            LogoMark.Draw(g, _markRect, _p.Brand, _p.BrandAccent);
+            TextRenderer.DrawText(g, Brand.Name, _p.Heading, _brandTextRect, _p.Ink,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+
+            // 键帽：与底下那条提示行同一套画法，只是字号大得多
+            KeyHint.Draw(g, _p, _headline, _big,
+                _headlineRect.X, _headlineRect.Y, _headlineRect.Height);
+
+            TextRenderer.DrawText(g, "随时唤出小条，写下就存进当天的日记。\n之后也可以在托盘图标上点右键找到它。",
+                _p.Body, _bodyRect, _p.Muted,
+                TextFormatFlags.Left | TextFormatFlags.WordBreak);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Escape) Close();   // 与失焦同一个语义
+            base.OnKeyDown(e);
+        }
+
+        /// <summary>
+        /// 失焦即关，与小条的 Esc 是同一套语义：**走开就收起来，不赖在屏幕上**。
+        /// <para>
+        /// 这张卡片是 TopMost 的，不这么做的话，使用者一点别处它就会一直盖在最上层，
+        /// 除非专门回来点「知道了」——第一印象就成了「关不掉的弹窗」。
+        /// </para>
+        /// <para>
+        /// 但它与点「知道了」不同：**关掉不等于看完了**，所以不接着弹设置页。
+        /// 别人明确点了按钮才代表他准备好继续。
+        /// </para>
+        /// </summary>
+        protected override void OnDeactivate(EventArgs e)
+        {
+            base.OnDeactivate(e);
+            if (!IsDisposed) Close();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && _big != null) _big.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+}

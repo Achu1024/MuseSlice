@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512" width="1024" height="512">
+  <title>MuseSlice Logo</title>
+  <desc>Minimal geometric MuseSlice logo in charcoal and indigo.</desc>
+
+  <!-- Icon -->
+  <g transform="translate(90 92)">
+    <!-- Main play/slice form -->
+    <path d="M0 22
+             Q0 0 19 11
+             L142 88
+             Q158 98 142 108
+             L19 185
+             Q0 197 0 174 Z"
+          fill="#171B2A"/>
+
+    <!-- Upper-right cut -->
+    <path d="M122 60 L178 25 Q194 15 194 35 L194 101 Q194 118 179 109 Z"
+          fill="#171B2A"/>
+
+    <!-- Lower slice -->
+    <path d="M54 197 L151 137 Q164 129 176 140
+             L193 157 Q202 166 190 174
+             L94 234 Q82 241 70 232 L53 216 Q43 207 54 197 Z"
+          fill="#5B43F5"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="350" y="305"
+        font-family="Inter, SF Pro Display, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif"
+        font-size="106"
+        font-weight="700"
+        letter-spacing="-5"
+        fill="#171B2A">MuseSlice</text>
+</svg>

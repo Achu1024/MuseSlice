@@ -1,0 +1,297 @@
+using System;
+using System.IO;
+using System.Threading;
+using System.Windows.Forms;
+using MuseSlice.Core;
+
+namespace MuseSlice
+{
+    internal sealed class MuseSliceApp : ApplicationContext
+    {
+        private readonly AppConfig _config;
+        private readonly TrayIcon _tray;
+        private readonly MessageWindow _messageWindow;
+        private HotkeyManager _hotkeys;
+        private NoteStore _store;      // 非 readonly：Task 13 改日记目录时要换掉
+
+        /// <summary>与 _bar 共用同一套配色。绝不每次用都新建——Palette 里握着 Font，
+        /// 反复新建会累积 GDI 句柄（那是有上限的资源，不是普通内存）。</summary>
+        private Palette _palette;
+
+        private CaptureBar _bar;
+
+        public MuseSliceApp(bool launchedByAutoStart)
+        {
+            // 「首次安装」的判据就是配置文件还不存在。AppConfig.Load 在文件缺失时
+            // 只用默认值、**不写文件**，所以这个判据得在 Load 之前取。
+            var firstRun = !File.Exists(AppConfig.DefaultConfigPath());
+            _config = AppConfig.Load(AppConfig.DefaultConfigPath());
+
+            // 立刻把默认配置落盘：否则使用者若把首次那张卡片直接点掉、没进设置页，
+            // 配置文件就始终不存在，下次启动又算「首次安装」——卡片每次都弹，
+            // 那就成了他躲不掉的弹窗。首次只有一次。
+            if (firstRun)
+            {
+                try { _config.Save(AppConfig.DefaultConfigPath()); }
+                catch (Exception ex) { Log("写入默认配置失败：" + ex.Message); }
+            }
+            _store = new NoteStore(_config.NotesDir);
+
+            var showMessage = NativeMethods.RegisterWindowMessage("MuseSlice.Show");
+            _messageWindow = new MessageWindow(showMessage);
+            _messageWindow.ShowRequested += ShowBar;   // 第二个实例被启动时由这里弹出小条
+
+            _tray = new TrayIcon(_config.AutoStart);
+            _tray.ShowRequested += ShowBar;
+            _tray.OpenTodayRequested += OpenToday;
+            _tray.OpenNotesFolderRequested += OpenNotesFolder;
+            _tray.ExitRequested += ExitApp;
+            _tray.SettingsRequested += OpenSettings;
+            _tray.AutoStartToggled += ToggleAutoStart;
+
+            _palette = Theme.Current(_config.Theme);
+            _bar = new CaptureBar(_palette, _store);
+            _bar.Saved += OnSaved;
+            SaveChime.Prepare();
+
+            // 启动动画：手动双击才放一遍。开机自启是替使用者干活，不是他打招呼，
+            // 每次都糊一层动画在脸上只会让人想去关掉自启（见 AutoStart.Flag）。
+            //
+            // 首次运行也跳过：那张欢迎卡片是这次真正要看的东西，动画会盖在它上面。
+            if (!launchedByAutoStart && !firstRun)
+            {
+                try { new SplashOverlay().Play(); }
+                catch (Exception ex) { Log("启动动画失败：" + ex.Message); }
+            }
+
+            _hotkeys = new HotkeyManager(_config);
+            _hotkeys.Degraded += delegate (string reason)
+            {
+                _tray.Balloon(Brand.Name + " 热键降级", reason);
+            };
+            _hotkeys.Start(ShowBar, _messageWindow.Handle, showMessage);
+
+            // 自启：注册表里存的是绝对路径，程序挪过位置就静默失效，每次启动自查一遍
+            AutoStart.EnsurePathCurrent();
+            if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
+
+            // spec 第 11 节：笔记目录不存在时启动就建好。否则托盘里的
+            // 「打开今天的日记」会因目录缺失抛异常，而使用者看不到任何反馈。
+            try { Directory.CreateDirectory(_config.NotesDir); }
+            catch (Exception ex) { Log("创建笔记目录失败：" + ex.Message); }
+
+            if (firstRun) PromptFirstRun();
+        }
+
+        /// <summary>
+        /// 首次安装：把设置页推给使用者。默认值能用，但日记目录这种东西不该让人
+        /// 自己去猜、也不该等到发现「日记不知道存哪去了」才回来找。
+        /// <para>
+        /// 延后一拍再弹，不在构造函数里直接 ShowDialog：那时消息循环还没跑起来，
+        /// 托盘图标也还没出现，弹一个模态框会让人不知道它是谁弹的。
+        /// </para>
+        /// </summary>
+        private void PromptFirstRun()
+        {
+            var once = new System.Windows.Forms.Timer { Interval = 400 };
+            once.Tick += delegate
+            {
+                once.Stop();
+                once.Dispose();
+
+                // 先教怎么把它叫出来——这是唯一一次「教怎么用」的机会。
+                // 看完再去确认设置：设置页讲的是配置，而使用者此刻还不知道
+                // 这个东西平时在哪、怎么喊出来。
+                using (var card = new WelcomeCardNew(_palette)) card.ShowDialog();
+                OpenSettings();
+            };
+            once.Start();
+        }
+
+        /// <summary>
+        /// 保存成功的回执：根据配置选择效果音或通知。
+        /// <para>
+        /// 默认使用效果音（sounds/12-快门.wav），用户可在设置中切换为系统通知。
+        /// </para>
+        /// <para>
+        /// 通知走托盘气泡（Shell_NotifyIcon）。Win10 起系统会把它渲染成原生通知横幅，
+        /// 不需要任何额外基建，也不用我们在屏幕右下角自己养一张卡片。
+        /// </para>
+        /// </summary>
+        private void OnSaved()
+        {
+            Log($"OnSaved called. SaveFeedback={_config.SaveFeedback}");
+            if (_config.SaveFeedback == AppConfig.FeedbackNotification)
+            {
+                _tray.Balloon(Brand.Name, "已记录");
+            }
+            else
+            {
+                // 默认使用效果音
+                Log("Playing save chime...");
+                SaveChime.Play();
+            }
+        }
+
+        private void ShowBar()
+        {
+            if (_bar == null) return;
+            _bar.OpenBar();
+        }
+
+        private void OpenToday()
+        {
+            try
+            {
+                Directory.CreateDirectory(_config.NotesDir);
+                var path = Path.Combine(_config.NotesDir, DateFormat.FileName(DateTime.Now) + ".md");
+                if (!File.Exists(path)) File.WriteAllText(path, "", new System.Text.UTF8Encoding(false));
+                Open(path);
+            }
+            catch (Exception ex)
+            {
+                Log("打开今天的日记失败：" + ex);
+                _tray.Balloon(Brand.Name, "打不开今天的日记：" + ex.Message);
+            }
+        }
+
+        private void OpenNotesFolder()
+        {
+            try
+            {
+                Directory.CreateDirectory(_config.NotesDir);
+                Open(_config.NotesDir);
+            }
+            catch (Exception ex)
+            {
+                Log("打开日记目录失败：" + ex);
+                _tray.Balloon(Brand.Name, "打不开日记目录：" + ex.Message);
+            }
+        }
+
+        private static void Open(string path)
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
+            catch (Exception ex) { Log("打开失败 " + path + "：" + ex.Message); }
+        }
+
+        private void OpenSettings()
+        {
+            using (var dlg = new SettingsDialogNew(_config, _palette))
+            {
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+            }
+
+            try
+            {
+                _store = new NoteStore(_config.NotesDir);
+                _bar.SetStore(_store);
+                _hotkeys.ApplyConfigChange();
+                _palette = Theme.Current(_config.Theme);
+                _bar.ApplyTheme(_palette);
+                if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
+                _tray.SetAutoStartChecked(_config.AutoStart);
+                _tray.Balloon(Brand.Name, "设置已保存");
+            }
+            catch (Exception ex)
+            {
+                // 托盘点击处理器里逃出去的异常只会被全局处理器写进日志，
+                // 使用者什么都看不到。这里必须自己说出来。
+                Log("应用设置失败：" + ex);
+                _tray.Balloon(Brand.Name + " 设置未能生效", ex.Message);
+            }
+        }
+
+        private void ToggleAutoStart()
+        {
+            _config.AutoStart = !_config.AutoStart;
+            if (_config.AutoStart) AutoStart.Enable(); else AutoStart.Disable();
+            _config.Save(AppConfig.DefaultConfigPath());
+            _tray.SetAutoStartChecked(_config.AutoStart);
+        }
+
+        private void ExitApp()
+        {
+            // 直接退出会把使用者写了三行还没保存的东西丢掉，先问一句。
+            var draft = _bar == null ? "" : _bar.Draft;
+            if (draft.Trim().Length > 0)
+            {
+                var answer = MessageBox.Show(
+                    "还有没保存的内容：\n\n" + draft + "\n\n要退出吗？（退出后这些内容会丢失）",
+                    Brand.Name, MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (answer != DialogResult.Yes) return;
+            }
+            ExitThread();
+        }
+
+        public static void Log(string message)
+        {
+            try
+            {
+                Directory.CreateDirectory(AppConfig.AppDataDir());
+                File.AppendAllText(Path.Combine(AppConfig.AppDataDir(), "error.log"),
+                    DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + message + Environment.NewLine,
+                    new System.Text.UTF8Encoding(false));
+            }
+            catch { /* 记日志失败绝不能反过来把程序搞崩 */ }
+        }
+
+        protected override void ExitThreadCore()
+        {
+            if (_hotkeys != null) _hotkeys.Dispose();
+            if (_tray != null) _tray.Dispose();
+            if (_messageWindow != null) _messageWindow.Dispose();
+            base.ExitThreadCore();
+        }
+    }
+
+    internal static class Program
+    {
+        private static Mutex _mutex;
+
+        [STAThread]
+        private static void Main(string[] args)
+        {
+            bool createdNew;
+            _mutex = new Mutex(true, "MuseSlice.SingleInstance", out createdNew);
+            if (!createdNew)
+            {
+                // 已有实例在跑：请它弹出小条，然后自己退出。
+                // 否则误双击 exe 会出现两个托盘图标和两个小条。
+                var msg = NativeMethods.RegisterWindowMessage("MuseSlice.Show");
+                NativeMethods.PostMessage(new IntPtr(0xFFFF), msg, IntPtr.Zero, IntPtr.Zero);
+                return;
+            }
+
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += delegate (object s, ThreadExceptionEventArgs e)
+            {
+                MuseSliceApp.Log("界面线程异常：" + e.Exception);
+            };
+            AppDomain.CurrentDomain.UnhandledException += delegate (object s, UnhandledExceptionEventArgs e)
+            {
+                MuseSliceApp.Log("未处理异常：" + e.ExceptionObject);
+            };
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new MuseSliceApp(IsAutoStartLaunch(args)));
+
+            GC.KeepAlive(_mutex);
+        }
+
+        /// <summary>
+        /// 是不是开机自启拉起来的。命令行里带 <see cref="AutoStart.Flag"/> 就是——
+        /// 那条命令由 <see cref="AutoStart"/> 自己写进注册表，所以两边不会走散。
+        /// </summary>
+        private static bool IsAutoStartLaunch(string[] args)
+        {
+            if (args == null) return false;
+            foreach (var arg in args)
+            {
+                if (string.Equals(arg, AutoStart.Flag, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+    }
+}

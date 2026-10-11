@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>MuseSlice App Icon</title>
+  <desc>Minimal rounded-square MuseSlice icon in white, charcoal and indigo.</desc>
+
+  <!-- White rounded-square background -->
+  <rect x="24" y="24" width="976" height="976" rx="210" fill="#FFFFFF"/>
+
+  <!-- MuseSlice symbol -->
+  <g transform="translate(238 255)">
+    <!-- Main play/slice form -->
+    <path d="M0 42
+             Q0 0 36 21
+             L395 246
+             Q427 266 395 287
+             L36 512
+             Q0 535 0 493 Z"
+          fill="#171B2A"/>
+
+    <!-- Upper-right cut -->
+    <path d="M338 153 L502 50
+             Q530 33 530 68
+             L530 258
+             Q530 290 503 273 Z"
+          fill="#171B2A"/>
+
+    <!-- Lower slice -->
+    <path d="M157 548 L438 374
+             Q464 358 488 381
+             L536 427
+             Q554 445 532 463
+             L251 637
+             Q226 653 202 635
+             L153 589
+             Q135 570 157 548 Z"
+          fill="#5B43F5"/>
+  </g>
+</svg>
