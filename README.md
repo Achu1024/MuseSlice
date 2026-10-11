@@ -1,8 +1,6 @@
 <div align="center">
   <img src="icon/MuseSlice_logo.svg" alt="MuseSlice Logo" width="400"/>
 
-  # MuseSlice
-
   > 💡 为"只想记一笔"而生的轻量备忘工具 —— 双击 Ctrl，把一闪而过的念头留下来
 
   [**⬇️ 下载安装**](https://github.com/Achu1024/MuseSlice/releases/latest) · [功能](#-功能一览) · [数据在哪](#-数据在哪) · [从源码构建](#-从源码构建)
