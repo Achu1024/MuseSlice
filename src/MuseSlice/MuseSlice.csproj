@@ -4,9 +4,13 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>MuseSlice</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\icon\MuseSlice.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\MuseSlice.Core\MuseSlice.Core.csproj" />
+    <Content Include="..\..\icon\MuseSlice.ico" Link="MuseSlice.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="..\..\sounds\12-快门.wav" Link="sounds\12-快门.wav">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

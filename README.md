@@ -1,78 +1,108 @@
 <div align="center">
   <img src="icon/MuseSlice_logo.svg" alt="MuseSlice Logo" width="400"/>
-  
+
   # MuseSlice
-  
-  > 💡 轻量级快速笔记工具 - 随时捕获灵光一现的想法
+
+  > 💡 轻量级快速笔记工具 —— 双击 Ctrl，把一闪而过的念头留下来
 </div>
 
-## ✨ 核心特性
+## ✨ 为什么是 MuseSlice
 
-**极致轻量** - 无需打开完整应用，全局热键瞬间唤出输入栏
-- 🚀 常驻系统托盘，占用资源极少
-- ⚡ 纯追加式写入，毫秒级响应
-- 📦 单文件启动，开箱即用
+记一笔的成本，决定了你会不会真的去记。MuseSlice 把这条链路压到最短：**双击 Ctrl → 打字 → Enter**，结束。
 
-**便捷高效** - 专注于快速记录，摒弃一切繁琐操作
-- ⌨️ 双击 `Ctrl` 快速唤出输入栏
-- 📝 输入即保存，无需手动操作
-- 📅 自动按日期整理为 Markdown 文件
-- ✅ 智能识别待办事项格式
+**极致轻量**
 
-## 🎯 使用场景
+- 📦 安装包不到 1 MB，常驻托盘，不吃内存不占屏
+- ⚡ 纯追加写入，不读全文、不解析格式，落盘就是毫秒级
+- 🧩 无数据库、无云同步、无账号 —— 你的笔记就是一堆 `.md` 文件
 
-- **灵感捕获**：写代码时突然有个想法？按下热键，记录，继续工作
-- **快速备忘**：会议中需要记个事项？唤出输入栏，一秒搞定
-- **待办管理**：每行自动转换为待办事项，支持勾选框语法
+**顺手到无感**
 
-## 🚀 快速开始
+- ⌨️ **双击 `Ctrl`** 唤出输入栏，不打断手上的事
+- 📝 `Enter` 即存，没有"保存"按钮这个概念
+- 📅 自动按日期归档成 Markdown，天然可被 Obsidian / Logseq 接管
+- ✅ 每行自动成为一条待办，`- [ ]` 勾选框语法直接可用
+- 🔍 记得写过但忘了哪天？在输入条里按 `Tab` 直接搜历史笔记
 
-1. 下载并运行 `MuseSlice.exe`
-2. 程序自动常驻系统托盘
-3. **双击 `Ctrl` 键**唤出输入栏
-4. 输入内容后按 `Enter` 保存，按 `Esc` 关闭
+## 🎯 适用场景
 
-## 📁 笔记存储
+| 场景 | 用法 |
+|------|------|
+| 灵感捕获 | 写代码卡壳时冒出个念头，双击 Ctrl 记录，继续敲代码 |
+| 会议速记 | 一边听一边记，一行一件事，散会直接变待办清单 |
+| 每日复盘 | 一天结束打开当天的 `.md`，做过什么一目了然 |
 
-- 默认保存位置：`我的文档\MuseSlice`
-- 文件格式：Markdown（`.md`）
-- 命名规则：`YYYY-MM-DD.md`（按日期自动分类）
-- 每条记录自动添加时间戳
+## 🚀 安装
 
-## ⚙️ 配置选项
+到 [**Releases**](https://github.com/Achu1024/MuseSlice/releases/latest) 下载最新的 `MuseSlice-Setup-x.y.z.exe`，双击安装。
 
-右键系统托盘图标可以：
-- 📂 打开今日笔记
-- 🗂️ 打开笔记文件夹
-- ⚡ 切换开机自启动
-- 🎨 自定义热键和界面
+- 安装程序会**默认勾选**"创建桌面快捷方式"，取消勾选则只进开始菜单
+- 每用户安装，装到 `%LOCALAPPDATA%\Programs\MuseSlice`，**不需要管理员权限**
+- 装完自动启动，之后它就安静地待在托盘里
 
-## 🛠️ 技术栈
+### 上手三步
 
-- **框架**：.NET / WinForms
-- **语言**：C#
-- **架构**：轻量化设计，三层结构
-  - `MuseSlice.Core`：核心逻辑
-  - `MuseSlice`：UI 界面
-  - `MuseSlice.SelfCheck`：自检测试
+1. 双击 **`Ctrl`** —— 唤出输入框
+2. 输入内容，`Enter` 保存（`Esc` 直接关掉）
+3. 想翻旧账就按 `Tab` 进搜索；想调热键、换保存位置就右键托盘图标 →「设置」
 
-## 💻 开发构建
+## 📁 数据在哪
+
+| 内容 | 位置 |
+|------|------|
+| 日记 | `我的文档\MuseSlice\YYYY-MM-DD.md` |
+| 配置 | `%APPDATA%\MuseSlice\config.ini` |
+
+纯文本、纯本地。想备份就拷文件夹，想迁移就直接带走。
+
+## ⚙️ 托盘菜单
+
+右键托盘图标：
+
+- ✏️ 记一笔（等同双击 Ctrl）
+- 📂 打开今天的日记
+- 🗂️ 打开日记目录
+- ⚡ 开机自启开关
+- ⚙️ 设置 —— 热键模式与双击判定窗口、备用组合键、日记目录、主题、提示音
+- ❌ 退出
+
+## 🛠️ 从源码构建
+
+需要 .NET SDK（项目目标框架 `net48`）。
 
 ```bash
-# 克隆项目
 git clone https://github.com/Achu1024/MuseSlice.git
+cd MuseSlice
 
-# 编译项目
+# 只编译程序
 dotnet build MuseSlice.sln -c Release
+# 产物：bin/MuseSlice/Release/MuseSlice.exe
 
-# 运行程序
-dotnet run --project src/MuseSlice
+# 打安装包（需要 Inno Setup 6：winget install JRSoftware.InnoSetup）
+powershell -ExecutionPolicy Bypass -File build-installer.ps1
+# 产物：dist/MuseSlice-Setup-0.1.0.exe
+```
+
+### 项目结构
+
+```
+src/MuseSlice.Core/       核心逻辑：存储、搜索、几何、配置
+src/MuseSlice/            WinForms 界面：输入条、托盘、设置
+src/MuseSlice.SelfCheck/  自检用例，不依赖测试框架
+installer/                Inno Setup 安装脚本
+tools/make_icon.py        从品牌图生成多尺寸 .ico
+```
+
+改完代码跑一遍自检：
+
+```bash
+dotnet run --project src/MuseSlice.SelfCheck -c Release
 ```
 
 ## 📄 许可证
 
-本项目采用开源许可证，欢迎贡献代码和反馈建议。
+本项目采用开源许可证，欢迎提交 Issue 和 PR。
 
 ---
 
-**设计理念**：好的笔记工具应该让你忘记它的存在，只在需要时瞬间出现。MuseSlice 就是这样一个工具 —— 轻量、快速、不打扰。
+**设计理念**：好的笔记工具应该让你忘记它的存在，只在需要时瞬间出现。
