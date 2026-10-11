@@ -111,7 +111,7 @@ namespace MuseSlice
         /// <summary>
         /// 保存成功的回执：根据配置选择效果音或通知。
         /// <para>
-        /// 默认使用效果音（sounds/12-快门.wav），用户可在设置中切换为系统通知。
+        /// 默认使用效果音（sounds/shutter.wav），用户可在设置中切换为系统通知。
         /// </para>
         /// <para>
         /// 通知走托盘气泡（Shell_NotifyIcon）。Win10 起系统会把它渲染成原生通知横幅，

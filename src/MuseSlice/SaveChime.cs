@@ -8,7 +8,7 @@ namespace MuseSlice
     /// <summary>保存成功时播放的快门声。</summary>
     internal static class SaveChime
     {
-        private const string SoundRelativePath = "sounds\\12-快门.wav";
+        private const string SoundRelativePath = "sounds\\shutter.wav";
         private static SoundPlayer _player;
         private static MemoryStream _stream;
 

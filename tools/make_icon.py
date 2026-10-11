@@ -5,7 +5,7 @@
 from PIL import Image
 import numpy as np
 
-SRC = "icon/极简 MuseSlice 品牌标志展示.png"
+SRC = "icon/brand-showcase.png"
 OUT = "icon/MuseSlice.ico"
 BG = np.array([242, 242, 242])  # 展示图的近白底
 
